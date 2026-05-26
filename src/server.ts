@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { registerGetMetadata } from './tools/get_metadata.js';
 import { registerPing } from './tools/ping.js';
 
 export function createServer(): McpServer {
@@ -8,6 +9,7 @@ export function createServer(): McpServer {
   });
 
   registerPing(server);
+  registerGetMetadata(server);
 
   return server;
 }
