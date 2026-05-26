@@ -3,6 +3,6 @@ export async function withTiming<T>(name: string, fn: () => Promise<T>): Promise
   try {
     return await fn();
   } finally {
-    console.log(`[tool:${name}] ${Date.now() - start}ms`);
+    console.error(`[tool:${name}] ${Date.now() - start}ms`);
   }
 }
