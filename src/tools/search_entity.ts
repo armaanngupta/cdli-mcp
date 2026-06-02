@@ -4,7 +4,6 @@ import { cdliFetch, cdliUrl } from '../cdliAPI/client.js';
 import { toErrorResponse } from '../util/errors.js';
 import { withTiming } from '../util/timing.js';
 
-// Authoritative filter keys per entity (source: Codex scan of cdli/framework, 2026-05-26)
 const ENTITY_FILTERS = {
   abbreviations: ['abbreviation', 'fullform'],
   archives: ['archive', 'provenience_id'],
