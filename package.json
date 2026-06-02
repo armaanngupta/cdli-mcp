@@ -7,7 +7,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node --input-type=module -e \"import{cpSync,mkdirSync}from'node:fs';mkdirSync('dist/vocab',{recursive:true});cpSync('src/vocab/vocab.json','dist/vocab/vocab.json');\"",
     "dev": "tsx watch src/index.ts",
     "lint": "eslint src/",
     "format": "prettier --write src",
@@ -16,15 +16,16 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "fastest-levenshtein": "^1.0.16",
     "zod": "^3.24.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "eslint": "^9.0.0",
-    "typescript-eslint": "^8.0.0",
     "prettier": "^3.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.4.0",
+    "typescript-eslint": "^8.0.0",
     "vitest": "^2.0.0"
   }
 }

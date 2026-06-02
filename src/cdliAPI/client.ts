@@ -1,7 +1,7 @@
 import { ErrorCode, McpError } from '../util/errors.js';
 
 const BASE_URL = 'https://cdli.earth';
-const DEFAULT_TIMEOUT_MS = 8000;
+const DEFAULT_TIMEOUT_MS = 10000;
 
 export async function cdliFetch<T>(url: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
   const controller = new AbortController();
