@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { cdliFetch, cdliUrl } from '../cdliAPI/client.js';
 import { toErrorResponse } from '../util/errors.js';
 import { withTiming } from '../util/timing.js';
+import { groundTerm } from '../vocab/ground_term.js';
 
 const DEFAULT_LIMIT = 25;
 
@@ -31,8 +32,9 @@ export function registerAdvancedSearch(server: McpServer): void {
 Builds: GET https://cdli.earth/search.json?{fields}&limit&page
 
 Multiple fields are combined with AND. Per-field value syntax:
-- Plain value: matches the indexed term — use the exact canonical value
-  (period "Ur III" not "Ur 3"; provenience "Nippur"). Abbreviations/typos match poorly.
+- Plain value: matches the indexed term. Common typos and alternate forms are
+  corrected automatically for period, genre, language, material, artifact_type,
+  and provenience (e.g. "Ur 3" → "Ur III").
 - "quoted" — exact phrase match.
 - /pattern/ — regular expression.
 - * and ? — wildcards, e.g. "Nipp*".
@@ -68,9 +70,16 @@ consecutive calls in a single turn.`,
       withTiming('advanced_search', async () => {
         try {
           const params = new URLSearchParams();
+          const corrections: string[] = [];
+
           for (const field of SEARCH_FIELDS) {
             const value = input[field];
-            if (value !== undefined && value !== '') params.set(field, value);
+            if (value === undefined || value === '') continue;
+            const grounded = groundTerm(field, value);
+            params.set(field, grounded.value);
+            if (grounded.corrected) {
+              corrections.push(`"${grounded.original}" → "${grounded.value}"`);
+            }
           }
 
           const limit = input.limit ?? DEFAULT_LIMIT;
@@ -79,16 +88,20 @@ consecutive calls in a single turn.`,
           params.set('page', String(page));
 
           const url = cdliUrl(`/search.json?${params.toString()}`);
-          const results = await cdliFetch<unknown[]>(url);
+          const results = await cdliFetch<unknown[]>(url, 15000);
 
-          const note =
+          const lines: string[] = [
             `Returned ${results.length} result(s) on page ${page} (limit ${limit}). ` +
-            `Request page ${page + 1} for more.`;
+              `Request page ${page + 1} for more.`,
+          ];
+          if (corrections.length > 0) {
+            lines.push(`Grounded: ${corrections.join(', ')}`);
+          }
 
           return {
             content: [
               { type: 'text' as const, text: JSON.stringify(results, null, 2) },
-              { type: 'text' as const, text: note },
+              { type: 'text' as const, text: lines.join('\n') },
             ],
           };
         } catch (err) {
