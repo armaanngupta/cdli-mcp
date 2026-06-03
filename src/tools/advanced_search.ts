@@ -123,6 +123,26 @@ consecutive calls in a single turn.`,
     async (input) =>
       withTiming('advanced_search', async () => {
         try {
+          const hasFilter = SEARCH_FIELDS.some(
+            (f) => input[f] !== undefined && input[f] !== '',
+          );
+          if (!hasFilter) {
+            return {
+              isError: true,
+              content: [
+                {
+                  type: 'text' as const,
+                  text: JSON.stringify({
+                    code: 'NO_FILTERS',
+                    message:
+                      'Provide at least one search field. Use get_metadata to browse entity lists instead.',
+                    retryable: false,
+                  }),
+                },
+              ],
+            };
+          }
+
           const params = new URLSearchParams();
           const corrections: string[] = [];
 
