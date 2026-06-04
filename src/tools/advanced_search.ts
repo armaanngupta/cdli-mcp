@@ -173,7 +173,7 @@ consecutive calls in a single turn.`,
 
           return {
             content: [
-              { type: 'text' as const, text: JSON.stringify(cards, null, 2) },
+              { type: 'text' as const, text: JSON.stringify(cards) },
               { type: 'text' as const, text: lines.join('\n') },
             ],
           };

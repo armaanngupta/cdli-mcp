@@ -66,7 +66,7 @@ Prefer advanced_search over listing all artifacts. Avoid more than ~5 consecutiv
           const projected =
             entity === 'artifacts' && resolvedId !== undefined ? denoise(data) : data;
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify(projected, null, 2) }],
+            content: [{ type: 'text' as const, text: JSON.stringify(projected) }],
           };
         } catch (err) {
           return toErrorResponse(err);

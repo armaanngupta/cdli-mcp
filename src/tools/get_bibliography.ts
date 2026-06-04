@@ -44,7 +44,7 @@ Avoid more than ~5 consecutive calls in a single turn.`,
           const note = `${compressed.length} publication(s) found for artifact ${id}.`;
           return {
             content: [
-              { type: 'text' as const, text: `${note}\n\n${JSON.stringify(compressed, null, 2)}` },
+              { type: 'text' as const, text: `${note}\n\n${JSON.stringify(compressed)}` },
             ],
           };
         } catch (err) {
