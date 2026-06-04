@@ -62,7 +62,7 @@ Notes:
 
           const data = await cdliFetch<unknown>(url);
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
+            content: [{ type: 'text' as const, text: JSON.stringify(data) }],
           };
         } catch (err) {
           return toErrorResponse(err);

@@ -1,6 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { cdliFetch, cdliUrl } from '../cdliAPI/client.js';
+import { compressArtifact } from '../cdliAPI/compress.js';
+import { CdliArtifactRecord } from '../cdliAPI/types.js';
 import { toErrorResponse } from '../util/errors.js';
 import { withTiming } from '../util/timing.js';
 import { groundTerm } from '../vocab/ground_term.js';
@@ -99,10 +101,7 @@ consecutive calls in a single turn.`,
         .optional()
         .describe('Publication author name(s). Use %AND% or %OR% for multiple.'),
       publication_editors: z.string().optional().describe('Publication editor name(s).'),
-      publication_year: z
-        .string()
-        .optional()
-        .describe('Publication year, e.g. "2003".'),
+      publication_year: z.string().optional().describe('Publication year, e.g. "2003".'),
       publication_title: z.string().optional().describe('Title of the publication.'),
       publication_type: z
         .string()
@@ -123,9 +122,7 @@ consecutive calls in a single turn.`,
     async (input) =>
       withTiming('advanced_search', async () => {
         try {
-          const hasFilter = SEARCH_FIELDS.some(
-            (f) => input[f] !== undefined && input[f] !== '',
-          );
+          const hasFilter = SEARCH_FIELDS.some((f) => input[f] !== undefined && input[f] !== '');
           if (!hasFilter) {
             return {
               isError: true,
@@ -162,11 +159,13 @@ consecutive calls in a single turn.`,
           params.set('page', String(page));
 
           const url = cdliUrl(`/search.json?${params.toString()}`);
-          const results = await cdliFetch<unknown[]>(url, 15000);
+          const results = await cdliFetch<CdliArtifactRecord[]>(url, 15000);
+          const cards = results.map(compressArtifact);
 
           const lines: string[] = [
-            `Returned ${results.length} result(s) on page ${page} (limit ${limit}). ` +
-              `Request page ${page + 1} for more.`,
+            `Returned ${cards.length} result(s) on page ${page} (limit ${limit}). ` +
+              `Request page ${page + 1} for more. ` +
+              `Each card is a summary — use get_inscription / get_bibliography with its id for full content.`,
           ];
           if (corrections.length > 0) {
             lines.push(`Grounded: ${corrections.join(', ')}`);
@@ -174,7 +173,7 @@ consecutive calls in a single turn.`,
 
           return {
             content: [
-              { type: 'text' as const, text: JSON.stringify(results, null, 2) },
+              { type: 'text' as const, text: JSON.stringify(cards) },
               { type: 'text' as const, text: lines.join('\n') },
             ],
           };

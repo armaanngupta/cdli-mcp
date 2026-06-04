@@ -63,6 +63,12 @@ export function cdliUrl(path: string): string {
   return `${BASE_URL}${path}`;
 }
 
+// Canonical human-facing artifact page (confirmed 200, no redirect). Distinct from
+// the /artifacts/{id}.json data endpoint — this is the URL a card links out to.
+export function cdliArtifactUrl(id: string | number): string {
+  return `${BASE_URL}/artifacts/${normalizeArtifactId(String(id))}`;
+}
+
 // Normalizes P000001, P12345, 12345 → bare integer string (e.g. "1", "12345")
 export function normalizeArtifactId(input: string): string {
   return String(parseInt(input.replace(/^P0*/i, ''), 10));
