@@ -28,6 +28,48 @@ export async function cdliFetch<T>(url: string, timeoutMs = DEFAULT_TIMEOUT_MS):
   }
 }
 
+// Sibling of cdliFetch for endpoints whose pagination metadata lives in response
+// headers (the search Link header), which res.json() alone would discard.
+export async function cdliFetchWithHeaders<T>(
+  url: string,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+): Promise<{ data: T; headers: Headers }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) {
+      throw new McpError(
+        ErrorCode.UPSTREAM_ERROR,
+        `CDLI returned ${res.status} for ${url}`,
+        res.status >= 500,
+      );
+    }
+    return { data: (await res.json()) as T, headers: res.headers };
+  } catch (err) {
+    if (err instanceof McpError) throw err;
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new McpError(ErrorCode.TIMEOUT, `Request timed out after ${timeoutMs}ms`, true);
+    }
+    throw new McpError(ErrorCode.UPSTREAM_ERROR, String(err), false);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Parses an RFC-5988 Link header into a { rel: url } map. fetch joins repeated
+// Link headers with ", ", which this splits back out by matching each segment.
+export function parseLinkHeader(headers: Headers): Record<string, string> {
+  const raw = headers.get('link');
+  if (!raw) return {};
+  const links: Record<string, string> = {};
+  for (const match of raw.matchAll(/<([^>]+)>;\s*rel="([^"]+)"/g)) {
+    links[match[2]] = match[1];
+  }
+  return links;
+}
+
 // 404 (no inscription / uninscribed / nonexistent) and 406 (exists but not annotated) are
 // expected outcomes for inscription format routes, not errors — surfaced for the caller to phrase.
 export type TextResult = { ok: true; text: string } | { ok: false; status: 404 | 406 };

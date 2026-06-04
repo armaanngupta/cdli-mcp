@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { cdliFetch, cdliUrl } from '../cdliAPI/client.js';
+import { cdliFetchWithHeaders, cdliUrl, parseLinkHeader } from '../cdliAPI/client.js';
 import { compressArtifact } from '../cdliAPI/compress.js';
 import { CdliArtifactRecord } from '../cdliAPI/types.js';
 import { toErrorResponse } from '../util/errors.js';
@@ -63,9 +63,10 @@ atf_transliteration searches within inscription text (supports /regex/ and wildc
 atf_translation_text searches within English translations.
 For full inscription content use get_inscription.
 
-Pagination is page-based (no total count yet): inspect the returned result count
-and request the next page with "page" (limit max 10000). Avoid more than ~5
-consecutive calls in a single turn.`,
+The response reports the total number of matching artifacts (exact for a single
+page, otherwise an estimate). Page through results with "page"; to read beyond
+~10,000 results, use the search_after cursor echoed in the response instead.
+Avoid more than ~5 consecutive calls in a single turn.`,
     {
       provenience: z.string().optional().describe('Findspot/origin, e.g. "Nippur"'),
       period: z.string().optional().describe('Period, e.g. "Ur III"'),
@@ -118,6 +119,13 @@ consecutive calls in a single turn.`,
       update_authors: z.string().optional().describe('CDLI contributor / update author name.'),
       limit: z.number().int().min(1).max(100).optional().describe('Results per page (default 25)'),
       page: z.number().int().min(1).optional().describe('1-based page number (default 1)'),
+      search_after: z
+        .string()
+        .optional()
+        .describe(
+          'Cursor for deep paging, taken from the previous response. Use this instead of page ' +
+            'to read beyond ~10,000 results (page-based paging fails past that depth).',
+        ),
     },
     async (input) =>
       withTiming('advanced_search', async () => {
@@ -157,16 +165,40 @@ consecutive calls in a single turn.`,
           const page = input.page ?? 1;
           params.set('limit', String(limit));
           params.set('page', String(page));
+          if (input.search_after) params.set('search_after', input.search_after);
 
           const url = cdliUrl(`/search.json?${params.toString()}`);
-          const results = await cdliFetch<CdliArtifactRecord[]>(url, 15000);
+          const { data: results, headers } = await cdliFetchWithHeaders<CdliArtifactRecord[]>(
+            url,
+            15000,
+          );
           const cards = results.map(compressArtifact);
 
+          const links = parseLinkHeader(headers);
+          const lastPage = links.last
+            ? Number(new URL(links.last).searchParams.get('page'))
+            : undefined;
+          const nextCursor = links.next
+            ? (new URL(links.next).searchParams.get('search_after') ?? undefined)
+            : undefined;
+
+          // Option A: the API exposes no exact total. A single page (last <= 1) means we hold
+          // every match, so report it exactly; otherwise last_page * limit is an upper-bound estimate.
+          const singlePage = lastPage === undefined || lastPage <= 1;
+          const total = singlePage ? cards.length : lastPage * limit;
+
           const lines: string[] = [
-            `Returned ${cards.length} result(s) on page ${page} (limit ${limit}). ` +
-              `Request page ${page + 1} for more. ` +
-              `Each card is a summary — use get_inscription / get_bibliography with its id for full content.`,
+            singlePage
+              ? `${total} artifact(s) match.`
+              : `~${total.toLocaleString('en-US')} artifacts match (${lastPage.toLocaleString('en-US')} pages). ` +
+                `Returned ${cards.length} on page ${page} (limit ${limit}).`,
           ];
+          if (nextCursor) {
+            lines.push(`More results: call again with search_after="${nextCursor}".`);
+          }
+          lines.push(
+            'Each card is a summary — use get_inscription / get_bibliography with its id for full content.',
+          );
           if (corrections.length > 0) {
             lines.push(`Grounded: ${corrections.join(', ')}`);
           }
