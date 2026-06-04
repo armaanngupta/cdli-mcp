@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { cdliFetch, cdliUrl, normalizeArtifactId } from '../cdliAPI/client.js';
+import { denoise } from '../cdliAPI/compress.js';
 import { toErrorResponse } from '../util/errors.js';
 import { withTiming } from '../util/timing.js';
 
@@ -52,15 +53,20 @@ Prefer advanced_search over listing all artifacts. Avoid more than ~5 consecutiv
       withTiming('get_metadata', async () => {
         try {
           const path = ENTITY_PATHS[entity];
-          const resolvedId = id !== undefined && entity === 'artifacts' ? normalizeArtifactId(id) : id;
+          const resolvedId =
+            id !== undefined && entity === 'artifacts' ? normalizeArtifactId(id) : id;
           const url =
             resolvedId !== undefined
               ? cdliUrl(`/${path}/${resolvedId}.json`)
               : cdliUrl(`/${path}.json`);
 
           const data = await cdliFetch<unknown>(url);
+          // By-ID artifact is the "give me everything" view: keep full depth but
+          // strip FK/admin noise. All other entities and list mode stay raw.
+          const projected =
+            entity === 'artifacts' && resolvedId !== undefined ? denoise(data) : data;
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
+            content: [{ type: 'text' as const, text: JSON.stringify(projected, null, 2) }],
           };
         } catch (err) {
           return toErrorResponse(err);
