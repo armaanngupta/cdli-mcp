@@ -1,0 +1,52 @@
+import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import type { Request, Response } from 'express';
+import { createServer } from '../server.js';
+
+const METHOD_NOT_ALLOWED = JSON.stringify({
+  jsonrpc: '2.0',
+  error: { code: -32000, message: 'Method not allowed.' },
+  id: null,
+});
+
+export async function startHttp(port: number): Promise<void> {
+  const app = createMcpExpressApp({ host: '0.0.0.0' });
+
+  app.use((_req: Request, res: Response, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Mcp-Session-Id');
+    next();
+  });
+
+  app.options('/mcp', (_req: Request, res: Response) => {
+    res.sendStatus(204);
+  });
+
+  app.post('/mcp', async (req: Request, res: Response) => {
+    const server = createServer();
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    await server.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+    res.on('close', () => {
+      transport.close();
+      server.close();
+    });
+  });
+
+  app.get('/mcp', (_req: Request, res: Response) => {
+    res.writeHead(405).end(METHOD_NOT_ALLOWED);
+  });
+
+  app.delete('/mcp', (_req: Request, res: Response) => {
+    res.writeHead(405).end(METHOD_NOT_ALLOWED);
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    const httpServer = app.listen(port, () => {
+      console.log(`CDLI MCP server (HTTP) listening on http://0.0.0.0:${port}/mcp`);
+      resolve();
+    });
+    httpServer.on('error', reject);
+  });
+}
