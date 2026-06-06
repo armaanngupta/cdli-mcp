@@ -28,13 +28,13 @@ export async function startHttp(port: number): Promise<Server> {
   app.post('/mcp', async (req: Request, res: Response) => {
     const server = createServer();
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    res.on('close', () => {
+      transport.close();
+      server.close();
+    });
     try {
       await server.connect(transport);
       await transport.handleRequest(req, res, req.body);
-      res.on('close', () => {
-        transport.close();
-        server.close();
-      });
     } catch (error) {
       console.error('MCP request error:', error);
       transport.close();
