@@ -1,6 +1,7 @@
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { Request, Response } from 'express';
+import type { Server } from 'node:http';
 import { createServer } from '../server.js';
 
 const METHOD_NOT_ALLOWED = JSON.stringify({
@@ -9,7 +10,7 @@ const METHOD_NOT_ALLOWED = JSON.stringify({
   id: null,
 });
 
-export async function startHttp(port: number): Promise<void> {
+export async function startHttp(port: number): Promise<Server> {
   const app = createMcpExpressApp({ host: '0.0.0.0' });
 
   app.use((_req: Request, res: Response, next) => {
@@ -55,10 +56,10 @@ export async function startHttp(port: number): Promise<void> {
     res.writeHead(405).end(METHOD_NOT_ALLOWED);
   });
 
-  await new Promise<void>((resolve, reject) => {
+  return new Promise<Server>((resolve, reject) => {
     const httpServer = app.listen(port, () => {
       console.log(`CDLI MCP server (HTTP) listening on http://0.0.0.0:${port}/mcp`);
-      resolve();
+      resolve(httpServer);
     });
     httpServer.on('error', reject);
   });
