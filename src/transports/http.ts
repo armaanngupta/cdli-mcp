@@ -11,7 +11,8 @@ const METHOD_NOT_ALLOWED = JSON.stringify({
 });
 
 export async function startHttp(port: number): Promise<Server> {
-  const app = createMcpExpressApp({ host: '0.0.0.0' });
+  const allowedHosts = process.env.ALLOWED_HOSTS?.split(',').map((h) => h.trim());
+  const app = createMcpExpressApp({ host: '0.0.0.0', ...(allowedHosts && { allowedHosts }) });
 
   app.use((_req: Request, res: Response, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
