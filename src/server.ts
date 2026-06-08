@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerAdvancedSearch } from './tools/advanced_search.js';
+import { registerCqpQuery } from './tools/cqp_query.js';
 import { registerGetBibliography } from './tools/get_bibliography.js';
 import { registerGetInscription } from './tools/get_inscription.js';
 import { registerGetMetadata } from './tools/get_metadata.js';
@@ -18,6 +19,7 @@ export function createServer(): McpServer {
   registerGetInscription(server);
   registerGetBibliography(server);
   registerSearchEntity(server);
+  registerCqpQuery(server);
 
   return server;
 }
