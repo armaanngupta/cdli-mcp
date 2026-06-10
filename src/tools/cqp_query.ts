@@ -43,12 +43,21 @@ function assertJoinedIfMultiToken(cqp: string): void {
   }
 }
 
-// KWIC line: left context ... [matched word(s)] ... right context. Raw RDF link URIs are dropped.
+// The annotation link URI (.../P100065.conll#s1_17) carries the source tablet's P-number — the
+// only key that ties a corpus hit back to the rest of the CDLI toolset (get_metadata, etc.). We
+// keep just that P-number and drop the rest of the URI (a GitHub annotation path, useless here).
+function pNumber(row: ResultRow): string | null {
+  return row.keywords[0]?.link.match(/P\d+/)?.[0] ?? null;
+}
+
+// KWIC line: P-number  left context ... [matched word(s)] ... right context.
 function formatRow(row: ResultRow): string {
   const left = row.l_context.map((w) => w.word).join(' ');
   const match = row.keywords.map((w) => w.word).join(' ');
   const right = row.r_context.map((w) => w.word).join(' ');
-  return [left, `[${match}]`, right].filter((s) => s.trim() !== '').join(' ');
+  const kwic = [left, `[${match}]`, right].filter((s) => s.trim() !== '').join(' ');
+  const p = pNumber(row);
+  return p ? `${p}  ${kwic}` : kwic;
 }
 
 function formatResponse(data: CqpResponse): string {
@@ -94,7 +103,7 @@ Seal of [person]:     w1:[ ( conll:FORM = "kiszib3" ) ] w2:[ ( conll:UPOSTAG = "
 Son of [person]:      w1:[ ( conll:FORM = "dumu" ) ] w2:[ ( conll:XPOSTAG = "PN" ) ] :: (w1.nif:nextWord=w2)
 Nouns in genitive:    w1:[ ( conll:UPOSTAG = "NOUN" ) & ( conll:FEATS = "Case=Gen" ) ]
 
-Returns 50 results per page. If the response says more are available, re-call with the next page number. An error usually means the CQP syntax is invalid — revise the query and retry.
+Returns 50 results per page as KWIC lines. Each line begins with the source tablet's P-number (e.g. P100065), which you can pass to get_metadata or get_inscription to look up that tablet. If the response says more are available, re-call with the next page number. An error usually means the CQP syntax is invalid — revise the query and retry.
 
 Avoid more than ~5 consecutive calls in a single turn.`,
     {
