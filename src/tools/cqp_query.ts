@@ -74,6 +74,8 @@ Syntactic head:     w1:[...] w2:[...] :: (w1.conll:HEAD=w2)
 
 CRITICAL: every query with 2+ word tokens MUST include a :: join constraint (e.g. :: (w1.nif:nextWord=w2)). This is not about ordering — without a join the backend computes a Cartesian product over every word in the corpus (e.g. 139 x 2546 = 354,094 pairs) and ALWAYS times out. A bare multi-token query like w1:[...] w2:[...] will fail every time. Never emit one. If you only need two words anywhere together, you still must join them (use nif:nextWord for adjacency, or conll:HEAD for a syntactic relation).
 
+KNOWN LIMITATION: multi-word queries (2+ word tokens) frequently TIME OUT on the backend right now, even when correctly joined. Single-word queries are reliable. Prefer a single-word query when one can answer the question; only use a multi-word join when the relation between words is essential, and expect it may fail. A timeout here means the query was too expensive — not that there are no matches.
+
 FIELDS (always prefix with conll:)
 - conll:FORM — Sumerian surface form on the tablet. Common: "lugal" (king), "udu" (sheep), "niga" (fattened), "mu" (year), "iti" (month), "ki" (place/from), "dumu" (son), "kiszib3" (seal), "szunigin" (total), "sze" (barley), "saga" (fine), "dub-sar" (scribe), "giri3" (via/authority). Do NOT query forms containing ( ) { } [ ] — they are regex metacharacters.
 - conll:UPOSTAG — coarse POS: NOUN, NUM, PROPN, VERB, CCONJ.
@@ -117,9 +119,24 @@ Avoid more than ~5 consecutive calls in a single turn.`,
             corpus: CORPUS,
           });
           const data = await cdliFetch<CqpResponse>(`${base}?${params.toString()}`, CQP_TIMEOUT_MS);
-          if (data.results.length === 0) return text('No results found for this query.');
+          if (data.results.length === 0)
+            return text(
+              'No matches in the corpus for this query. The query ran successfully — the corpus simply contains no words matching it. Do NOT retry unchanged.',
+            );
           return text(formatResponse(data));
         } catch (err) {
+          // A timeout here is the backend giving up on an expensive query (typically a multi-word
+          // join or a very frequent form), NOT an empty result — matches may exist but cannot be
+          // computed in time. Reword so the model narrows the query rather than reading it as "no data".
+          if (err instanceof McpError && err.code === ErrorCode.TIMEOUT) {
+            return toErrorResponse(
+              new McpError(
+                ErrorCode.TIMEOUT,
+                'The corpus backend timed out on this query. This is a known limit on expensive queries (multi-word joins, or a very frequent leading token) — it does NOT mean there are no matches. Narrow the query (rarer leading token, fewer word tokens, or a more specific field) and retry.',
+                true,
+              ),
+            );
+          }
           return toErrorResponse(err);
         }
       }),
