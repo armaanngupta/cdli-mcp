@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: cdli-mcp
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run serve
+    envVars:
+      # The SDK validates the Host header against ALLOWED_HOSTS, so the Render
+      # hostname must be listed here or every request is rejected.
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: CQP_BASE_URL
+        sync: false
