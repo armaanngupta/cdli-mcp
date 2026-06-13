@@ -38,7 +38,37 @@ const SEARCH_FIELDS = [
   'archive',
   'written_in',
   'update_authors',
+  'update_external_resource',
+  'atf_transcription',
+  'atf_structure',
+  'atf_comments',
 ] as const;
+
+// Sort keys accepted by the framework's `order[]` param 
+const SORT_FIELDS = [
+  '_score',
+  'id',
+  'designation',
+  'period_sequence',
+  'dates_referenced',
+  'composite_no',
+  'seal_no',
+  'museum_no',
+  'collection',
+  'provenience',
+  'artifact_type',
+] as const;
+
+// Data-availability facets. 
+const HAS_FACET = {
+  translation: 'atf_translation',
+  transliteration: 'atf_transliteration',
+  transcription: 'atf_transcription',
+  text_annotation: 'annotation',
+  image_annotation: 'asset_annotations',
+  publication: 'publication',
+  chemical_data: 'chemical_data',
+} as const;
 
 export function registerAdvancedSearch(server: McpServer): void {
   server.tool(
@@ -61,7 +91,18 @@ id and composite_no accept bare numbers (P/Q prefixes are stripped).
 
 atf_transliteration searches within inscription text (supports /regex/ and wildcards).
 atf_translation_text searches within English translations.
+atf_transcription / atf_structure / atf_comments search within the transcription,
+structural ATF tags, and ATF comments respectively.
 For full inscription content use get_inscription.
+
+has and order are optional refinements — only pass them when the task genuinely
+needs them, never by default:
+- has: restrict to artifacts that actually carry the named data, e.g.
+  has=["translation"]. Use only when missing that data would make a result
+  useless (e.g. assembling a corpus for textual analysis).
+- order: the default order is already stable (id-ascending), so only set this when
+  you need a specific sort — a chronological study (period_sequence) or a
+  reproducible full sweep.
 
 The response reports the total number of matching artifacts (exact for a single
 page, otherwise an estimate). Page through results with "page"; to read beyond
@@ -86,8 +127,8 @@ Avoid more than ~5 consecutive calls in a single turn.`,
         .string()
         .optional()
         .describe(
-          'Search within ATF transliteration text. Supports /regex/, sign permutation, ' +
-            'and wildcards. Example: /lugal/ matches any line containing "lugal".',
+          'Search within ATF transliteration text. Supports /regex/ and wildcards. ' +
+            'Example: /lugal/ matches any line containing "lugal".',
         ),
       atf_translation_text: z
         .string()
@@ -117,6 +158,34 @@ Avoid more than ~5 consecutive calls in a single turn.`,
       archive: z.string().optional().describe('Archive name.'),
       written_in: z.string().optional().describe('Region or script the text was written in.'),
       update_authors: z.string().optional().describe('CDLI contributor / update author name.'),
+      update_external_resource: z
+        .string()
+        .optional()
+        .describe('Contributing project / external resource credited on an update.'),
+      atf_transcription: z.string().optional().describe('Search within transcription text.'),
+      atf_structure: z
+        .string()
+        .optional()
+        .describe('Search within structural ATF tags, e.g. "@obverse", "@column".'),
+      atf_comments: z.string().optional().describe('Search within comments embedded in the ATF.'),
+      has: z
+        .array(z.enum(Object.keys(HAS_FACET) as [keyof typeof HAS_FACET]))
+        .optional()
+        .describe(
+          'Optional — only when missing this data would make a result useless. Keeps ' +
+            'artifacts that have the named data. Options: ' +
+            Object.keys(HAS_FACET).join(', ') +
+            '. Multiple are ANDed (must have all).',
+        ),
+      order: z
+        .array(z.enum(SORT_FIELDS))
+        .optional()
+        .describe(
+          'Optional — default is already stable (id-ascending); set only when a specific ' +
+            'sort is needed. Keys applied in order, e.g. ["period_sequence","id"]. Options: ' +
+            SORT_FIELDS.join(', ') +
+            '.',
+        ),
       limit: z.number().int().min(1).max(100).optional().describe('Results per page (default 25)'),
       page: z.number().int().min(1).optional().describe('1-based page number (default 1)'),
       search_after: z
@@ -130,7 +199,9 @@ Avoid more than ~5 consecutive calls in a single turn.`,
     async (input) =>
       withTiming('advanced_search', async () => {
         try {
-          const hasFilter = SEARCH_FIELDS.some((f) => input[f] !== undefined && input[f] !== '');
+          const hasFilter =
+            SEARCH_FIELDS.some((f) => input[f] !== undefined && input[f] !== '') ||
+            (input.has?.length ?? 0) > 0;
           if (!hasFilter) {
             return {
               isError: true,
@@ -161,6 +232,14 @@ Avoid more than ~5 consecutive calls in a single turn.`,
             }
           }
 
+          for (const key of input.has ?? []) {
+            params.append(`f[${HAS_FACET[key]}][]`, 'With');
+          }
+
+          for (const key of input.order ?? []) {
+            params.append('order[]', key);
+          }
+
           const limit = input.limit ?? DEFAULT_LIMIT;
           const page = input.page ?? 1;
           params.set('limit', String(limit));
@@ -182,8 +261,6 @@ Avoid more than ~5 consecutive calls in a single turn.`,
             ? (new URL(links.next).searchParams.get('search_after') ?? undefined)
             : undefined;
 
-          // Option A: the API exposes no exact total. A single page (last <= 1) means we hold
-          // every match, so report it exactly; otherwise last_page * limit is an upper-bound estimate.
           const singlePage = lastPage === undefined || lastPage <= 1;
           const total = singlePage ? cards.length : lastPage * limit;
 
