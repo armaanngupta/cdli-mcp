@@ -46,7 +46,7 @@ export function registerGetInscription(server: McpServer): void {
 Accepts a P-number (P000001, P12345) or a bare integer (12345).
 
 Formats:
-- atf (default) — ASCII Transliteration Format, the canonical transliteration of the tablet.
+- atf (default) — ASCII Transliteration Format, the canonical transliteration of the tablet. When a translation is available, it is embedded inline within the ATF (on #tr. translation lines), so look there for it.
 - cdli-conll — CDLI linguistic annotation (lemmatization, morphology) in CoNLL.
 - conll-u — Universal Dependencies CoNLL-U annotation.
 
