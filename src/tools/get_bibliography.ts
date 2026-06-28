@@ -13,17 +13,21 @@ function extractPublications(records: CdliArtifactRecord[]): CdliPublicationEntr
 }
 
 export function registerGetBibliography(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     'get_bibliography',
-    `Fetch the bibliography (publications) for a CDLI artifact.
+    {
+      description: `Fetch the bibliography (publications) for a CDLI artifact.
 
 Accepts a P-number (P000001, P12345) or a bare integer (12345). Returns the list of scholarly publications that have documented or studied the artifact — each entry carries publication_type (citation vs. history) and a nested publication object (title, authors, year, bibtexkey, etc.).
 
 Not every artifact has publications; when none exist the tool reports that instead.
 
 Avoid more than ~5 consecutive calls in a single turn.`,
-    {
-      id: z.string().describe('Artifact ID. Accepts P-numbers (P000001) or bare integers (12345).'),
+      inputSchema: {
+        id: z
+          .string()
+          .describe('Artifact ID. Accepts P-numbers (P000001) or bare integers (12345).'),
+      },
     },
     async ({ id }) =>
       withTiming('get_bibliography', async () => {
@@ -43,9 +47,7 @@ Avoid more than ~5 consecutive calls in a single turn.`,
           const compressed = publications.map(compressPublication);
           const note = `${compressed.length} publication(s) found for artifact ${id}.`;
           return {
-            content: [
-              { type: 'text' as const, text: `${note}\n\n${JSON.stringify(compressed)}` },
-            ],
+            content: [{ type: 'text' as const, text: `${note}\n\n${JSON.stringify(compressed)}` }],
           };
         } catch (err) {
           return toErrorResponse(err);

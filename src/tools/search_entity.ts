@@ -29,9 +29,10 @@ const FILTER_DOCS = ENTITY_ENUM.map(
 ).join('\n');
 
 export function registerSearchEntity(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     'search_entity',
-    `Search CDLI reference entities using query filters.
+    {
+      description: `Search CDLI reference entities using query filters.
 
 Builds: GET https://cdli.earth/{entity}.json?{filters}
 
@@ -43,13 +44,14 @@ Notes:
 - Unknown filter keys are passed through to the API unchanged.
 - To list all records without filtering, use get_metadata instead.
 - Avoid more than ~5 consecutive calls in a single turn.`,
-    {
-      entity: z.enum(ENTITY_ENUM).describe('The CDLI entity type to search'),
-      filters: z
-        .record(z.string())
-        .optional()
-        .describe('Key-value filter params. See valid keys per entity in the tool description.'),
-      offset: z.number().int().min(0).optional().describe('Pagination offset'),
+      inputSchema: {
+        entity: z.enum(ENTITY_ENUM).describe('The CDLI entity type to search'),
+        filters: z
+          .record(z.string())
+          .optional()
+          .describe('Key-value filter params. See valid keys per entity in the tool description.'),
+        offset: z.number().int().min(0).optional().describe('Pagination offset'),
+      },
     },
     async ({ entity, filters, offset }) =>
       withTiming('search_entity', async () => {

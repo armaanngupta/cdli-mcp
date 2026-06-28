@@ -69,9 +69,10 @@ function formatResponse(data: CqpResponse): string {
 }
 
 export function registerCqpQuery(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     'cqp_query',
-    `Search the CDLI corpus of ~375 Ur III Sumerian cuneiform administrative tablets using a CQP (Corpus Query Protocol) query. Texts are annotated with morphology and syntax; results come back as KWIC (keyword-in-context) lines.
+    {
+      description: `Search the CDLI corpus of ~375 Ur III Sumerian cuneiform administrative tablets using a CQP (Corpus Query Protocol) query. Texts are annotated with morphology and syntax; results come back as KWIC (keyword-in-context) lines.
 
 QUERY SYNTAX
 Single word:        w1:[ ( conll:FIELD = "value" ) ]
@@ -106,16 +107,17 @@ Nouns in genitive:    w1:[ ( conll:UPOSTAG = "NOUN" ) & ( conll:FEATS = "Case=Ge
 Returns 50 results per page as KWIC lines. Each line begins with the source tablet's P-number (e.g. P100065), which you can pass to get_metadata or get_inscription to look up that tablet. If the response says more are available, re-call with the next page number. An error usually means the CQP syntax is invalid — revise the query and retry.
 
 Avoid more than ~5 consecutive calls in a single turn.`,
-    {
-      cqp_query: z
-        .string()
-        .describe('A CQP query string. See the tool description for syntax and fields.'),
-      page: z
-        .number()
-        .int()
-        .min(1)
-        .default(1)
-        .describe('Page number (50 results per page). Defaults to 1.'),
+      inputSchema: {
+        cqp_query: z
+          .string()
+          .describe('A CQP query string. See the tool description for syntax and fields.'),
+        page: z
+          .number()
+          .int()
+          .min(1)
+          .default(1)
+          .describe('Page number (50 results per page). Defaults to 1.'),
+      },
     },
     async ({ cqp_query, page }) =>
       withTiming('cqp_query', async () => {

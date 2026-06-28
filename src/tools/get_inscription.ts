@@ -22,7 +22,9 @@ function extractAtf(records: CdliArtifact[]): string | undefined {
 async function fetchAtf(nid: string, displayId: string) {
   const records = await cdliFetch<CdliArtifact[]>(cdliUrl(`/artifacts/${nid}.json`));
   const atf = extractAtf(records);
-  return atf === undefined ? text(`No inscription available for artifact ${displayId}.`) : text(atf);
+  return atf === undefined
+    ? text(`No inscription available for artifact ${displayId}.`)
+    : text(atf);
 }
 
 // CoNLL formats use the path-based route /artifacts/{id}/inscription/{format}; an Accept header or
@@ -39,9 +41,10 @@ async function fetchConll(nid: string, displayId: string, format: ConllFormat) {
 }
 
 export function registerGetInscription(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     'get_inscription',
-    `Fetch the inscription for a CDLI artifact in a chosen format.
+    {
+      description: `Fetch the inscription for a CDLI artifact in a chosen format.
 
 Accepts a P-number (P000001, P12345) or a bare integer (12345).
 
@@ -53,12 +56,15 @@ Formats:
 Most artifacts are not linguistically annotated, so cdli-conll / conll-u are often unavailable; when that happens the tool says so and you should fall back to atf. Artifacts with no inscription at all are reported too.
 
 Avoid more than ~5 consecutive calls in a single turn.`,
-    {
-      id: z.string().describe('Artifact ID. Accepts P-numbers (P000001) or bare integers (12345).'),
-      format: z
-        .enum(['atf', 'cdli-conll', 'conll-u'])
-        .default('atf')
-        .describe('Output format. Defaults to atf.'),
+      inputSchema: {
+        id: z
+          .string()
+          .describe('Artifact ID. Accepts P-numbers (P000001) or bare integers (12345).'),
+        format: z
+          .enum(['atf', 'cdli-conll', 'conll-u'])
+          .default('atf')
+          .describe('Output format. Defaults to atf.'),
+      },
     },
     async ({ id, format }) =>
       withTiming('get_inscription', async () => {
