@@ -1,9 +1,14 @@
 import { ErrorCode, McpError } from '../util/errors.js';
+import { cached } from '../util/cache.js';
 
 const BASE_URL = 'https://cdli.earth';
 const DEFAULT_TIMEOUT_MS = 10000;
 
 export async function cdliFetch<T>(url: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
+  return cached(`json:${url}`, () => fetchJson<T>(url, timeoutMs));
+}
+
+async function fetchJson<T>(url: string, timeoutMs: number): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -33,6 +38,13 @@ export async function cdliFetch<T>(url: string, timeoutMs = DEFAULT_TIMEOUT_MS):
 export async function cdliFetchWithHeaders<T>(
   url: string,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+): Promise<{ data: T; headers: Headers }> {
+  return cached(`headers:${url}`, () => fetchJsonWithHeaders<T>(url, timeoutMs));
+}
+
+async function fetchJsonWithHeaders<T>(
+  url: string,
+  timeoutMs: number,
 ): Promise<{ data: T; headers: Headers }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -78,6 +90,10 @@ export async function cdliFetchText(
   url: string,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 ): Promise<TextResult> {
+  return cached(`text:${url}`, () => fetchText(url, timeoutMs));
+}
+
+async function fetchText(url: string, timeoutMs: number): Promise<TextResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
