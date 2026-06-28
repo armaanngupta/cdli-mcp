@@ -4,11 +4,11 @@ import type { Request, Response } from 'express';
 import type { Server } from 'node:http';
 import { createServer } from '../server.js';
 
-const METHOD_NOT_ALLOWED = JSON.stringify({
+const METHOD_NOT_ALLOWED = {
   jsonrpc: '2.0',
   error: { code: -32000, message: 'Method not allowed.' },
   id: null,
-});
+};
 
 export async function startHttp(port: number): Promise<Server> {
   const allowedHosts = process.env.ALLOWED_HOSTS?.split(',').map((h) => h.trim());
@@ -50,11 +50,11 @@ export async function startHttp(port: number): Promise<Server> {
   });
 
   app.get('/mcp', (_req: Request, res: Response) => {
-    res.writeHead(405).end(METHOD_NOT_ALLOWED);
+    res.status(405).json(METHOD_NOT_ALLOWED);
   });
 
   app.delete('/mcp', (_req: Request, res: Response) => {
-    res.writeHead(405).end(METHOD_NOT_ALLOWED);
+    res.status(405).json(METHOD_NOT_ALLOWED);
   });
 
   return new Promise<Server>((resolve, reject) => {
