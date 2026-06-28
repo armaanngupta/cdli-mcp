@@ -1,9 +1,10 @@
 import 'dotenv/config';
+import type { Server } from 'node:http';
 import { startHttp } from './transports/http.js';
 
 const port = parseInt(process.env.PORT ?? '3000', 10);
 
-let server;
+let server: Server;
 try {
   server = await startHttp(port);
 } catch (err: unknown) {
