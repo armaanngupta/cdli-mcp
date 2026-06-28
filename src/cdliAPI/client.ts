@@ -15,6 +15,9 @@ async function fetchJson<T>(url: string, timeoutMs: number): Promise<T> {
   try {
     const res = await fetch(url, { signal: controller.signal });
     if (!res.ok) {
+      if (res.status === 404) {
+        throw new McpError(ErrorCode.NOT_FOUND, `Not found (404): ${url}`, false);
+      }
       throw new McpError(
         ErrorCode.UPSTREAM_ERROR,
         `CDLI returned ${res.status} for ${url}`,
@@ -52,6 +55,9 @@ async function fetchJsonWithHeaders<T>(
   try {
     const res = await fetch(url, { signal: controller.signal });
     if (!res.ok) {
+      if (res.status === 404) {
+        throw new McpError(ErrorCode.NOT_FOUND, `Not found (404): ${url}`, false);
+      }
       throw new McpError(
         ErrorCode.UPSTREAM_ERROR,
         `CDLI returned ${res.status} for ${url}`,
