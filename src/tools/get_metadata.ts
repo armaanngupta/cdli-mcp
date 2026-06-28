@@ -31,9 +31,10 @@ type EntityKey = keyof typeof ENTITY_PATHS;
 const ENTITY_ENUM = Object.keys(ENTITY_PATHS) as [EntityKey, ...EntityKey[]];
 
 export function registerGetMetadata(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     'get_metadata',
-    `Fetch metadata from CDLI for any supported entity type.
+    {
+      description: `Fetch metadata from CDLI for any supported entity type.
 
 Two modes:
 - List mode (no id): returns all records of that entity type, e.g. all periods or all genres.
@@ -42,12 +43,13 @@ Two modes:
 Supported entities: artifacts, inscriptions, publications, authors, periods, genres, languages, materials, proveniences, collections, regions, rulers, dynasties, journals, archives, artifact-types, sign-readings.
 
 Prefer advanced_search over listing all artifacts. Avoid more than ~5 consecutive calls in a single turn.`,
-    {
-      entity: z.enum(ENTITY_ENUM).describe('The CDLI entity type to fetch'),
-      id: z
-        .string()
-        .optional()
-        .describe('Record ID. For artifacts, accepts P-numbers (P000001) or bare integers.'),
+      inputSchema: {
+        entity: z.enum(ENTITY_ENUM).describe('The CDLI entity type to fetch'),
+        id: z
+          .string()
+          .optional()
+          .describe('Record ID. For artifacts, accepts P-numbers (P000001) or bare integers.'),
+      },
     },
     async ({ entity, id }) =>
       withTiming('get_metadata', async () => {

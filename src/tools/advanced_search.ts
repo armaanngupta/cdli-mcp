@@ -44,7 +44,7 @@ const SEARCH_FIELDS = [
   'atf_comments',
 ] as const;
 
-// Sort keys accepted by the framework's `order[]` param 
+// Sort keys accepted by the framework's `order[]` param
 const SORT_FIELDS = [
   '_score',
   'id',
@@ -59,7 +59,7 @@ const SORT_FIELDS = [
   'artifact_type',
 ] as const;
 
-// Data-availability facets. 
+// Data-availability facets.
 const HAS_FACET = {
   translation: 'atf_translation',
   transliteration: 'atf_transliteration',
@@ -71,9 +71,10 @@ const HAS_FACET = {
 } as const;
 
 export function registerAdvancedSearch(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     'advanced_search',
-    `Search CDLI artifacts by metadata fields.
+    {
+      description: `Search CDLI artifacts by metadata fields.
 
 Builds: GET https://cdli.earth/search.json?{fields}&limit&page
 
@@ -108,93 +109,100 @@ The response reports the total number of matching artifacts (exact for a single
 page, otherwise an estimate). Page through results with "page"; to read beyond
 ~10,000 results, use the search_after cursor echoed in the response instead.
 Avoid more than ~5 consecutive calls in a single turn.`,
-    {
-      provenience: z.string().optional().describe('Findspot/origin, e.g. "Nippur"'),
-      period: z.string().optional().describe('Period, e.g. "Ur III"'),
-      genre: z.string().optional().describe('Genre, e.g. "Administrative"'),
-      language: z.string().optional().describe('Language, e.g. "Sumerian"'),
-      material: z.string().optional().describe('Material, e.g. "clay"'),
-      collection: z.string().optional().describe('Holding collection, e.g. "Louvre"'),
-      artifact_type: z.string().optional().describe('Artifact type, e.g. "tablet"'),
-      designation: z.string().optional().describe('CDLI designation/title'),
-      museum_no: z.string().optional().describe('Museum number, e.g. "VAT 01533"'),
-      accession_no: z.string().optional().describe('Museum accession number'),
-      excavation_no: z.string().optional().describe('Excavation number'),
-      composite_no: z.string().optional().describe('Composite text number, e.g. "Q000002"'),
-      dates_referenced: z.string().optional().describe('Referenced date string'),
-      id: z.string().optional().describe('Numeric artifact id'),
-      atf_transliteration: z
-        .string()
-        .optional()
-        .describe(
-          'Search within ATF transliteration text. Supports /regex/ and wildcards. ' +
-            'Example: /lugal/ matches any line containing "lugal".',
-        ),
-      atf_translation_text: z
-        .string()
-        .optional()
-        .describe('Search within English translations of inscriptions.'),
-      publication_designation: z
-        .string()
-        .optional()
-        .describe('Publication designation, e.g. "MVN 3, 1".'),
-      publication_authors: z
-        .string()
-        .optional()
-        .describe('Publication author name(s). Use %AND% or %OR% for multiple.'),
-      publication_editors: z.string().optional().describe('Publication editor name(s).'),
-      publication_year: z.string().optional().describe('Publication year, e.g. "2003".'),
-      publication_title: z.string().optional().describe('Title of the publication.'),
-      publication_type: z
-        .string()
-        .optional()
-        .describe('Publication type, e.g. "primary", "history".'),
-      publication_publisher: z.string().optional().describe('Publisher name.'),
-      publication_series: z.string().optional().describe('Publication series name.'),
-      seal_no: z
-        .string()
-        .optional()
-        .describe('Seal number (S-number), e.g. "S000001". P/Q/S prefixes are stripped.'),
-      archive: z.string().optional().describe('Archive name.'),
-      written_in: z.string().optional().describe('Region or script the text was written in.'),
-      update_authors: z.string().optional().describe('CDLI contributor / update author name.'),
-      update_external_resource: z
-        .string()
-        .optional()
-        .describe('Contributing project / external resource credited on an update.'),
-      atf_transcription: z.string().optional().describe('Search within transcription text.'),
-      atf_structure: z
-        .string()
-        .optional()
-        .describe('Search within structural ATF tags, e.g. "@obverse", "@column".'),
-      atf_comments: z.string().optional().describe('Search within comments embedded in the ATF.'),
-      has: z
-        .array(z.enum(Object.keys(HAS_FACET) as [keyof typeof HAS_FACET]))
-        .optional()
-        .describe(
-          'Optional — only when missing this data would make a result useless. Keeps ' +
-            'artifacts that have the named data. Options: ' +
-            Object.keys(HAS_FACET).join(', ') +
-            '. Multiple are ANDed (must have all).',
-        ),
-      order: z
-        .array(z.enum(SORT_FIELDS))
-        .optional()
-        .describe(
-          'Optional — default is already stable (id-ascending); set only when a specific ' +
-            'sort is needed. Keys applied in order, e.g. ["period_sequence","id"]. Options: ' +
-            SORT_FIELDS.join(', ') +
-            '.',
-        ),
-      limit: z.number().int().min(1).max(100).optional().describe('Results per page (default 25)'),
-      page: z.number().int().min(1).optional().describe('1-based page number (default 1)'),
-      search_after: z
-        .string()
-        .optional()
-        .describe(
-          'Cursor for deep paging, taken from the previous response. Use this instead of page ' +
-            'to read beyond ~10,000 results (page-based paging fails past that depth).',
-        ),
+      inputSchema: {
+        provenience: z.string().optional().describe('Findspot/origin, e.g. "Nippur"'),
+        period: z.string().optional().describe('Period, e.g. "Ur III"'),
+        genre: z.string().optional().describe('Genre, e.g. "Administrative"'),
+        language: z.string().optional().describe('Language, e.g. "Sumerian"'),
+        material: z.string().optional().describe('Material, e.g. "clay"'),
+        collection: z.string().optional().describe('Holding collection, e.g. "Louvre"'),
+        artifact_type: z.string().optional().describe('Artifact type, e.g. "tablet"'),
+        designation: z.string().optional().describe('CDLI designation/title'),
+        museum_no: z.string().optional().describe('Museum number, e.g. "VAT 01533"'),
+        accession_no: z.string().optional().describe('Museum accession number'),
+        excavation_no: z.string().optional().describe('Excavation number'),
+        composite_no: z.string().optional().describe('Composite text number, e.g. "Q000002"'),
+        dates_referenced: z.string().optional().describe('Referenced date string'),
+        id: z.string().optional().describe('Numeric artifact id'),
+        atf_transliteration: z
+          .string()
+          .optional()
+          .describe(
+            'Search within ATF transliteration text. Supports /regex/ and wildcards. ' +
+              'Example: /lugal/ matches any line containing "lugal".',
+          ),
+        atf_translation_text: z
+          .string()
+          .optional()
+          .describe('Search within English translations of inscriptions.'),
+        publication_designation: z
+          .string()
+          .optional()
+          .describe('Publication designation, e.g. "MVN 3, 1".'),
+        publication_authors: z
+          .string()
+          .optional()
+          .describe('Publication author name(s). Use %AND% or %OR% for multiple.'),
+        publication_editors: z.string().optional().describe('Publication editor name(s).'),
+        publication_year: z.string().optional().describe('Publication year, e.g. "2003".'),
+        publication_title: z.string().optional().describe('Title of the publication.'),
+        publication_type: z
+          .string()
+          .optional()
+          .describe('Publication type, e.g. "primary", "history".'),
+        publication_publisher: z.string().optional().describe('Publisher name.'),
+        publication_series: z.string().optional().describe('Publication series name.'),
+        seal_no: z
+          .string()
+          .optional()
+          .describe('Seal number (S-number), e.g. "S000001". P/Q/S prefixes are stripped.'),
+        archive: z.string().optional().describe('Archive name.'),
+        written_in: z.string().optional().describe('Region or script the text was written in.'),
+        update_authors: z.string().optional().describe('CDLI contributor / update author name.'),
+        update_external_resource: z
+          .string()
+          .optional()
+          .describe('Contributing project / external resource credited on an update.'),
+        atf_transcription: z.string().optional().describe('Search within transcription text.'),
+        atf_structure: z
+          .string()
+          .optional()
+          .describe('Search within structural ATF tags, e.g. "@obverse", "@column".'),
+        atf_comments: z.string().optional().describe('Search within comments embedded in the ATF.'),
+        has: z
+          .array(z.enum(Object.keys(HAS_FACET) as [keyof typeof HAS_FACET]))
+          .optional()
+          .describe(
+            'Optional — only when missing this data would make a result useless. Keeps ' +
+              'artifacts that have the named data. Options: ' +
+              Object.keys(HAS_FACET).join(', ') +
+              '. Multiple are ANDed (must have all).',
+          ),
+        order: z
+          .array(z.enum(SORT_FIELDS))
+          .optional()
+          .describe(
+            'Optional — default is already stable (id-ascending); set only when a specific ' +
+              'sort is needed. Keys applied in order, e.g. ["period_sequence","id"]. Options: ' +
+              SORT_FIELDS.join(', ') +
+              '.',
+          ),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe('Results per page (default 25)'),
+        page: z.number().int().min(1).optional().describe('1-based page number (default 1)'),
+        search_after: z
+          .string()
+          .optional()
+          .describe(
+            'Cursor for deep paging, taken from the previous response. Use this instead of page ' +
+              'to read beyond ~10,000 results (page-based paging fails past that depth).',
+          ),
+      },
     },
     async (input) =>
       withTiming('advanced_search', async () => {
