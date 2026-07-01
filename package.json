@@ -1,36 +1,23 @@
 {
   "name": "cdli-mcp",
   "version": "0.1.0",
-  "description": "MCP server for the CDLI cuneiform corpus",
+  "description": "CDLI MCP monorepo — MCP server (Phase 1) and chat interface (Phase 2)",
+  "private": true,
   "type": "module",
   "engines": {
     "node": ">=20"
   },
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "build": "tsc && node --input-type=module -e \"import{cpSync,mkdirSync}from'node:fs';mkdirSync('dist/vocab',{recursive:true});cpSync('src/vocab/vocab.json','dist/vocab/vocab.json');\"",
-    "dev": "tsx watch src/index.ts",
-    "lint": "eslint src/",
-    "format": "prettier --write src",
-    "test": "vitest run",
-    "inspect": "npx @modelcontextprotocol/inspector tsx src/index.ts",
-    "dev:http": "tsx src/index-http.ts",
-    "serve": "node dist/index-http.js"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "dotenv": "^17.4.2",
-    "fastest-levenshtein": "^1.0.16",
-    "lru-cache": "^11.5.1",
-    "zod": "^3.24.0"
-  },
-  "devDependencies": {
-    "@types/express": "^5.0.6",
-    "@types/node": "^20.0.0",
-    "eslint": "^9.0.0",
-    "prettier": "^3.0.0",
-    "tsx": "^4.0.0",
-    "typescript": "^5.4.0",
-    "typescript-eslint": "^8.0.0",
-    "vitest": "^2.0.0"
+    "build": "npm run build -w @cdli/server",
+    "dev": "npm run dev -w @cdli/server",
+    "lint": "npm run lint -w @cdli/server",
+    "format": "npm run format -w @cdli/server",
+    "test": "npm run test -w @cdli/server",
+    "inspect": "npm run inspect -w @cdli/server",
+    "dev:http": "npm run dev:http -w @cdli/server",
+    "serve": "npm run serve -w @cdli/server"
   }
 }
