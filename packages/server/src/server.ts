@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { registerArtifactCardApp } from './apps/card.js';
 import { registerInscriptionApp } from './apps/inscription.js';
 import { registerAdvancedSearch } from './tools/advanced_search.js';
 import { registerCqpQuery } from './tools/cqp_query.js';
@@ -22,6 +23,7 @@ export function createServer(): McpServer {
   registerSearchEntity(server);
   registerCqpQuery(server);
   registerInscriptionApp(server);
+  registerArtifactCardApp(server);
 
   return server;
 }

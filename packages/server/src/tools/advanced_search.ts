@@ -1,5 +1,7 @@
+import { registerAppTool } from '@modelcontextprotocol/ext-apps/server';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { ARTIFACT_CARD_URI } from '../apps/card.js';
 import { cdliFetchWithHeaders, cdliUrl, parseLinkHeader } from '../cdliAPI/client.js';
 import { compressArtifact } from '../cdliAPI/compress.js';
 import { CdliArtifactRecord } from '../cdliAPI/types.js';
@@ -71,9 +73,12 @@ const HAS_FACET = {
 } as const;
 
 export function registerAdvancedSearch(server: McpServer): void {
-  server.registerTool(
+  registerAppTool(
+    server,
     'advanced_search',
     {
+      // Hosts without MCP Apps support ignore _meta and render the text content as before.
+      _meta: { ui: { resourceUri: ARTIFACT_CARD_URI } },
       description: `Search CDLI artifacts by metadata fields.
 
 Builds: GET https://cdli.earth/search.json?{fields}&limit&page
