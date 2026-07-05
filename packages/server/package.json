@@ -7,7 +7,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsc && node --input-type=module -e \"import{cpSync,mkdirSync}from'node:fs';mkdirSync('dist/vocab',{recursive:true});cpSync('src/vocab/vocab.json','dist/vocab/vocab.json');mkdirSync('dist/apps',{recursive:true});cpSync('src/apps/inscription-view.html','dist/apps/inscription-view.html');\"",
+    "build": "tsc && node --input-type=module -e \"import{cpSync,mkdirSync}from'node:fs';mkdirSync('dist/vocab',{recursive:true});cpSync('src/vocab/vocab.json','dist/vocab/vocab.json');mkdirSync('dist/apps',{recursive:true});cpSync('src/apps/inscription-view.html','dist/apps/inscription-view.html');cpSync('src/apps/card-view.html','dist/apps/card-view.html');\"",
     "build:app": "tsx scripts/build-app.ts",
     "dev": "tsx watch src/index.ts",
     "lint": "eslint src/",
