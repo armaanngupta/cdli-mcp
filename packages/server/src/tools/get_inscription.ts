@@ -1,5 +1,7 @@
+import { registerAppTool } from '@modelcontextprotocol/ext-apps/server';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { INSCRIPTION_VIEW_URI } from '../apps/inscription.js';
 import { cdliFetch, cdliFetchText, cdliUrl, normalizeArtifactId } from '../cdliAPI/client.js';
 import { CdliArtifact } from '../cdliAPI/types.js';
 import { toErrorResponse } from '../util/errors.js';
@@ -41,9 +43,12 @@ async function fetchConll(nid: string, displayId: string, format: ConllFormat) {
 }
 
 export function registerGetInscription(server: McpServer): void {
-  server.registerTool(
+  registerAppTool(
+    server,
     'get_inscription',
     {
+      // Hosts without MCP Apps support ignore _meta and render the text content as before.
+      _meta: { ui: { resourceUri: INSCRIPTION_VIEW_URI } },
       description: `Fetch the inscription for a CDLI artifact in a chosen format.
 
 Accepts a P-number (P000001, P12345) or a bare integer (12345).
