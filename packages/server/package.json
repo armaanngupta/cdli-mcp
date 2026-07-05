@@ -7,7 +7,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsc && node --input-type=module -e \"import{cpSync,mkdirSync}from'node:fs';mkdirSync('dist/vocab',{recursive:true});cpSync('src/vocab/vocab.json','dist/vocab/vocab.json');\"",
+    "build": "tsc && node --input-type=module -e \"import{cpSync,mkdirSync}from'node:fs';mkdirSync('dist/vocab',{recursive:true});cpSync('src/vocab/vocab.json','dist/vocab/vocab.json');mkdirSync('dist/apps',{recursive:true});cpSync('src/apps/inscription-view.html','dist/apps/inscription-view.html');\"",
+    "build:app": "tsx scripts/build-app.ts",
     "dev": "tsx watch src/index.ts",
     "lint": "eslint src/",
     "format": "prettier --write src",
@@ -17,7 +18,8 @@
     "serve": "node dist/index-http.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/ext-apps": "^1.7.4",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "^17.4.2",
     "fastest-levenshtein": "^1.0.16",
     "lru-cache": "^11.5.1",
@@ -26,6 +28,7 @@
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^20.0.0",
+    "esbuild": "^0.28.0",
     "eslint": "^9.0.0",
     "prettier": "^3.0.0",
     "tsx": "^4.0.0",
