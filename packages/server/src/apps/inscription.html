@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CDLI Inscription</title>
+    <style>
+      /* Palette and type mirror cdli.earth (main.css tokens: --cdli-blue, --gunmetal,
+         --foggy-grey, --danger; Open Sans body, Georgia article serif, radius 0).
+         Open Sans itself can't be @imported — the MCP Apps CSP blocks external hosts —
+         so the stack falls back to close system faces when it isn't installed. */
+      :root {
+        --paper: #fff;
+        --ink: #212529;
+        --muted: #495057;
+        --panel: #f7f7f7;
+        --panel-edge: #dee2e6;
+        --ruling: rgba(73, 80, 87, 0.15);
+        --blue: #1661ab;
+        --blue-fg: #fff;
+        --dmg: #c4302f;
+        --chip-bg: #eee;
+      }
+      [data-theme='dark'] {
+        --paper: #1a1c1f;
+        --ink: #e4e6e9;
+        --muted: #9aa2ab;
+        --panel: #24262a;
+        --panel-edge: #383b40;
+        --ruling: rgba(154, 162, 171, 0.18);
+        --blue: #4e94dd;
+        --blue-fg: #10365c;
+        --dmg: #e57368;
+        --chip-bg: #2b2e33;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) {
+          --paper: #1a1c1f;
+          --ink: #e4e6e9;
+          --muted: #9aa2ab;
+          --panel: #24262a;
+          --panel-edge: #383b40;
+          --ruling: rgba(154, 162, 171, 0.18);
+          --blue: #4e94dd;
+          --blue-fg: #10365c;
+          --dmg: #e57368;
+          --chip-bg: #2b2e33;
+        }
+      }
+      html,
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font:
+          14px/1.6 'Open Sans',
+          'Segoe UI',
+          system-ui,
+          Helvetica,
+          Arial,
+          sans-serif;
+      }
+      #root {
+        padding: 14px 16px;
+        max-width: 760px;
+      }
+      .cat {
+        display: flex;
+        gap: 6px 10px;
+        align-items: baseline;
+        flex-wrap: wrap;
+        margin-bottom: 4px;
+      }
+      .pnum {
+        font-family: ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace;
+        font-size: 12.5px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        padding: 1px 7px;
+        border: 1px solid var(--blue);
+        color: var(--blue);
+      }
+      .desig {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--blue);
+      }
+      .chip {
+        font-size: 10.5px;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        padding: 1px 7px;
+        background: var(--chip-bg);
+        border: 1px solid var(--panel-edge);
+      }
+      .trctl {
+        margin-left: auto;
+        display: inline-flex;
+        gap: 5px;
+        align-items: center;
+        font-size: 11.5px;
+        color: var(--muted);
+        cursor: pointer;
+        user-select: none;
+      }
+      .trctl input {
+        margin: 0;
+        accent-color: var(--blue);
+      }
+      .trctl input:focus-visible {
+        outline: 2px solid var(--blue);
+        outline-offset: 1px;
+      }
+      #root:has(#trtog:not(:checked)) .tr,
+      #root:has(#trtog:not(:checked)) .tr-row {
+        display: none;
+      }
+      .face {
+        position: relative;
+        margin: 18px 0 14px;
+        padding: 12px 14px;
+        background: var(--panel);
+        border: 1px solid var(--panel-edge);
+      }
+      .face-tag {
+        position: absolute;
+        top: -9px;
+        left: 14px;
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--blue-fg);
+        background: var(--blue);
+        padding: 1px 9px;
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 4px 0;
+        border-bottom: 1px solid var(--ruling);
+      }
+      .row:last-child {
+        border-bottom: none;
+      }
+      .ln {
+        flex: 0 0 34px;
+        text-align: right;
+        font-family: ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace;
+        font-size: 11px;
+        line-height: 1.7;
+        padding-top: 3px;
+        color: var(--muted);
+        user-select: none;
+      }
+      .cell {
+        flex: 1;
+        min-width: 0;
+      }
+      .tx {
+        font-family: ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace;
+        font-size: 13.5px;
+        line-height: 1.7;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      .tx sup,
+      .tx sub {
+        font-size: 0.72em;
+      }
+      .tx sup {
+        color: var(--muted);
+      }
+      .dmg {
+        color: var(--dmg);
+        border-bottom: 1px dotted var(--dmg);
+      }
+      .brk {
+        color: var(--muted);
+      }
+      .tr {
+        font-family: Georgia, 'Times New Roman', Times, serif;
+        font-style: italic;
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--ink);
+        opacity: 0.82;
+        margin: 1px 0 4px;
+      }
+      .trlang {
+        font-family: 'Open Sans', 'Segoe UI', system-ui, Helvetica, Arial, sans-serif;
+        font-style: normal;
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        border: 1px solid var(--panel-edge);
+        padding: 0 4px 1px;
+        margin-right: 7px;
+        vertical-align: 1px;
+      }
+      .state {
+        font-style: italic;
+        font-size: 12.5px;
+        color: var(--muted);
+      }
+      .cmt {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      /* CoNLL word grid (linguistic annotation view) */
+      .wrow {
+        display: grid;
+        grid-template-columns: 38px minmax(0, 1.15fr) minmax(0, 1fr) auto;
+        gap: 0 14px;
+        align-items: baseline;
+        padding: 3px 0;
+        border-bottom: 1px solid var(--ruling);
+      }
+      .wrow:last-child {
+        border-bottom: none;
+      }
+      .wrow .ln {
+        padding-top: 0;
+        line-height: inherit;
+      }
+      .whead {
+        font-size: 9.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--muted);
+        border-bottom: 1px solid var(--panel-edge);
+        padding-bottom: 4px;
+        margin-bottom: 2px;
+      }
+      .whead .ln {
+        font-family: inherit;
+        font-size: inherit;
+      }
+      .gloss {
+        font-family: Georgia, 'Times New Roman', Times, serif;
+        font-size: 13px;
+        font-style: italic;
+        cursor: help;
+      }
+      .gloss .name {
+        font-style: normal;
+        font-weight: 600;
+      }
+      .gloss .nogloss {
+        font-family: ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace;
+        font-style: normal;
+        font-size: 12px;
+        color: var(--muted);
+        cursor: default;
+      }
+      .pos {
+        justify-self: end;
+        font-size: 10px;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+        background: var(--chip-bg);
+        border: 1px solid var(--panel-edge);
+        padding: 0 6px 1px;
+        white-space: nowrap;
+        cursor: help;
+      }
+      .legend {
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .plain {
+        font-family: ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        margin: 0;
+      }
+      .wait {
+        color: var(--muted);
+        font-style: italic;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"><span class="wait">Loading inscription…</span></div>
+    <!--__APP_SCRIPT__-->
+  </body>
+</html>
