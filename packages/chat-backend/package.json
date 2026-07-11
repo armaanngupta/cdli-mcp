@@ -1,0 +1,37 @@
+{
+  "name": "@cdli/chat-backend",
+  "version": "0.1.0",
+  "description": "Chat backend for cdli.earth/chat — MCP host, router and agent loop",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "lint": "eslint src/",
+    "format": "prettier --write src",
+    "serve": "node dist/index.js"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.10",
+    "@ai-sdk/google": "^4.0.10",
+    "@ai-sdk/groq": "^4.0.6",
+    "@ai-sdk/mistral": "^4.0.7",
+    "@ai-sdk/openai": "^4.0.9",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "ai": "^7.0.18",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^20.19.41",
+    "eslint": "^9.39.4",
+    "prettier": "^3.9.4",
+    "tsx": "^4.23.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.63.0"
+  }
+}
