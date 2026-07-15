@@ -1,11 +1,22 @@
 import 'dotenv/config';
 import express from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { messageRouter } from './routes/message.js';
+import { ChatError, ErrorCode, sendError } from './util/errors.js';
 
 const port = parseInt(process.env.PORT ?? '8090', 10);
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
+// Body-parser failures (malformed JSON, oversize) would otherwise fall through to
+// Express's default handler, which leaks an HTML stack trace.
+app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
+  if (res.headersSent) {
+    next(err);
+    return;
+  }
+  sendError(res, new ChatError(ErrorCode.INVALID_INPUT, 400, 'Malformed request body'));
+});
 app.use(messageRouter);
 
 const server = app.listen(port, () => {

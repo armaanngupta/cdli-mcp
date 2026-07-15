@@ -7,6 +7,12 @@ export const ErrorCode = {
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 
+export interface ChatErrorBody {
+  code: ErrorCode;
+  message: string;
+  retryable: boolean;
+}
+
 export class ChatError extends Error {
   readonly code: ErrorCode;
   readonly status: number;
@@ -19,15 +25,19 @@ export class ChatError extends Error {
     this.status = status;
     this.retryable = retryable;
   }
+
+  toBody(): ChatErrorBody {
+    return { code: this.code, message: this.message, retryable: this.retryable };
+  }
+}
+
+export function errorBody(err: unknown): ChatErrorBody {
+  return err instanceof ChatError
+    ? err.toBody()
+    : { code: ErrorCode.UPSTREAM_ERROR, message: String(err), retryable: false };
 }
 
 export function sendError(res: Response, err: unknown): void {
-  const chatErr =
-    err instanceof ChatError
-      ? err
-      : new ChatError(ErrorCode.UPSTREAM_ERROR, 502, String(err), false);
-
-  res.status(chatErr.status).json({
-    error: { code: chatErr.code, message: chatErr.message, retryable: chatErr.retryable },
-  });
+  const status = err instanceof ChatError ? err.status : 502;
+  res.status(status).json({ error: errorBody(err) });
 }
