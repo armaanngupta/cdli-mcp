@@ -3,7 +3,8 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { runAgentTurn } from '../agent/loop.js';
 import { PROVIDERS, resolveModel } from '../llm/provider.js';
-import { ChatError, ErrorCode, sendError } from '../util/errors.js';
+import { ChatError, ErrorCode, errorBody, sendError } from '../util/errors.js';
+import { openSse, sendEvent } from '../util/sse.js';
 import { withTiming } from '../util/timing.js';
 
 const bodySchema = z.object({
@@ -38,13 +39,38 @@ messageRouter.post('/chat/api/message', async (req: Request, res: Response) => {
     return;
   }
 
+  const { messages, provider, byomKey, model } = parsed.data;
+
+  // 'close' also fires after a normal end — only a close before we finished is a disconnect.
+  const abort = new AbortController();
+  res.on('close', () => {
+    if (!res.writableEnded) {
+      console.error('[turn:message] client disconnected — aborting');
+      abort.abort();
+    }
+  });
+
+  openSse(res);
   try {
-    const { messages, provider, byomKey, model } = parsed.data;
     const result = await withTiming('message', () =>
-      runAgentTurn(resolveModel(provider, byomKey, model), messages),
+      runAgentTurn(
+        resolveModel(provider, byomKey, model),
+        messages,
+        {
+          onToken: (text) => sendEvent(res, 'token', { text }),
+          onTool: (name, status) => sendEvent(res, 'tool', { name, status }),
+        },
+        abort.signal,
+      ),
     );
-    res.json(result);
+    if (!abort.signal.aborted) {
+      sendEvent(res, 'done', { toolCallCount: result.toolCallCount });
+    }
   } catch (err) {
-    sendError(res, err);
+    if (!abort.signal.aborted) {
+      sendEvent(res, 'error', errorBody(err));
+    }
+  } finally {
+    res.end();
   }
 });

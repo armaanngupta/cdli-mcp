@@ -32,8 +32,9 @@ export async function callTool(
   client: Client,
   name: string,
   args: Record<string, unknown>,
+  signal?: AbortSignal,
 ): Promise<ToolCallOutcome> {
-  const result = await client.callTool({ name, arguments: args });
+  const result = await client.callTool({ name, arguments: args }, undefined, { signal });
   const content = Array.isArray(result.content) ? result.content : [];
   const text = content
     .filter((item): item is { type: 'text'; text: string } => item.type === 'text')
