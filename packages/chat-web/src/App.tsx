@@ -21,6 +21,7 @@ export function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [provider, setProvider] = useState('mistral');
+  const [model, setModel] = useState('');
   const [byomKey, setByomKey] = useState('');
   const [streamedText, setStreamedText] = useState<string | null>(null);
   const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
@@ -51,7 +52,7 @@ export function App() {
     let acc = '';
     try {
       await streamChat(
-        { messages: history, provider, byomKey: byomKey.trim() },
+        { messages: history, provider, byomKey: byomKey.trim(), model: model.trim() || undefined },
         {
           onToken: (text) => {
             acc += text;
@@ -103,6 +104,15 @@ export function App() {
                 </option>
               ))}
             </select>
+            <label htmlFor="model">Model (optional)</label>
+            <input
+              id="model"
+              type="text"
+              placeholder="provider default"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              disabled={busy}
+            />
             <label htmlFor="apikey">API key</label>
             <input
               id="apikey"
