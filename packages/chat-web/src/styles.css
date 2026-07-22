@@ -112,6 +112,28 @@ body {
   width: 100%;
 }
 
+.sidebar-section button {
+  font: inherit;
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--cdli-blue);
+  border-radius: 0;
+  background: #fff;
+  color: var(--cdli-blue);
+  cursor: pointer;
+}
+
+.key-hint {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin: 0.5rem 0 0;
+}
+
+.key-error {
+  color: var(--danger);
+}
+
 .chat {
   flex: 1;
   min-width: 0;

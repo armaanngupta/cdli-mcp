@@ -2,6 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { streamChat } from './api/chat';
 import type { ChatMessage, ToolStatus } from './api/chat';
 import { MessageView } from './components/MessageView';
+import {
+  clearEncryptedKey,
+  decryptApiKey,
+  encryptApiKey,
+  loadEncryptedKey,
+  saveEncryptedKey,
+} from './crypto/byomKey';
+import type { StoredKey } from './crypto/byomKey';
 
 const PROVIDERS = ['mistral', 'groq', 'google', 'anthropic', 'openai'];
 
@@ -22,7 +30,11 @@ export function App() {
   const [draft, setDraft] = useState('');
   const [provider, setProvider] = useState('mistral');
   const [model, setModel] = useState('');
-  const [byomKey, setByomKey] = useState('');
+  const [storedKey, setStoredKey] = useState<StoredKey | null>(null);
+  const [unlockedKey, setUnlockedKey] = useState('');
+  const [newKeyInput, setNewKeyInput] = useState('');
+  const [pin, setPin] = useState('');
+  const [keyError, setKeyError] = useState<string | null>(null);
   const [streamedText, setStreamedText] = useState<string | null>(null);
   const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -31,14 +43,51 @@ export function App() {
   const busy = streamedText !== null;
 
   useEffect(() => {
+    setStoredKey(loadEncryptedKey());
+  }, []);
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamedText, toolCalls]);
+
+  async function saveKey() {
+    if (!newKeyInput.trim() || !pin.trim()) {
+      setKeyError('Enter both an API key and a PIN.');
+      return;
+    }
+    const stored = await encryptApiKey(newKeyInput.trim(), pin.trim());
+    saveEncryptedKey(stored);
+    setStoredKey(stored);
+    setUnlockedKey(newKeyInput.trim());
+    setNewKeyInput('');
+    setPin('');
+    setKeyError(null);
+  }
+
+  async function unlockKey() {
+    if (!storedKey || !pin.trim()) return;
+    try {
+      setUnlockedKey(await decryptApiKey(storedKey, pin.trim()));
+      setPin('');
+      setKeyError(null);
+    } catch {
+      setKeyError('Incorrect PIN.');
+    }
+  }
+
+  function forgetKey() {
+    clearEncryptedKey();
+    setStoredKey(null);
+    setUnlockedKey('');
+    setPin('');
+    setKeyError(null);
+  }
 
   async function send() {
     const content = draft.trim();
     if (!content || busy) return;
-    if (!byomKey.trim()) {
-      setError('Enter your API key first.');
+    if (!unlockedKey) {
+      setError('Unlock your API key first.');
       return;
     }
 
@@ -52,7 +101,7 @@ export function App() {
     let acc = '';
     try {
       await streamChat(
-        { messages: history, provider, byomKey: byomKey.trim(), model: model.trim() || undefined },
+        { messages: history, provider, byomKey: unlockedKey, model: model.trim() || undefined },
         {
           onToken: (text) => {
             acc += text;
@@ -113,14 +162,55 @@ export function App() {
               onChange={(e) => setModel(e.target.value)}
               disabled={busy}
             />
-            <label htmlFor="apikey">API key</label>
-            <input
-              id="apikey"
-              type="password"
-              placeholder="paste your key"
-              value={byomKey}
-              onChange={(e) => setByomKey(e.target.value)}
-            />
+            {!storedKey && !unlockedKey && (
+              <>
+                <label htmlFor="apikey">API key</label>
+                <input
+                  id="apikey"
+                  type="password"
+                  placeholder="paste your key"
+                  value={newKeyInput}
+                  onChange={(e) => setNewKeyInput(e.target.value)}
+                />
+                <label htmlFor="save-pin">PIN (to encrypt it)</label>
+                <input
+                  id="save-pin"
+                  type="password"
+                  placeholder="choose a PIN"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && void saveKey()}
+                />
+                <button onClick={() => void saveKey()}>Save key</button>
+                <p className="key-hint">
+                  Encrypted with your PIN and kept only in this browser. Once unlocked it lives in
+                  memory for this tab and is sent directly to your chosen provider with each
+                  message — never stored on our server.
+                </p>
+              </>
+            )}
+            {storedKey && !unlockedKey && (
+              <>
+                <label htmlFor="unlock-pin">PIN</label>
+                <input
+                  id="unlock-pin"
+                  type="password"
+                  placeholder="enter your PIN"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && void unlockKey()}
+                />
+                <button onClick={() => void unlockKey()}>Unlock key</button>
+                <button onClick={forgetKey}>Forget key</button>
+              </>
+            )}
+            {unlockedKey && (
+              <>
+                <p className="key-hint">API key unlocked for this session.</p>
+                <button onClick={forgetKey}>Forget key</button>
+              </>
+            )}
+            {keyError && <p className="key-hint key-error">{keyError}</p>}
           </div>
         </aside>
 
