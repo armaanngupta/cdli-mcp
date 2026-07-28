@@ -3,6 +3,8 @@ import type { Response } from 'express';
 export const ErrorCode = {
   INVALID_INPUT: 'INVALID_INPUT',
   UPSTREAM_ERROR: 'UPSTREAM_ERROR',
+  UNAUTHORIZED: 'UNAUTHORIZED',
+  BUDGET_EXHAUSTED: 'BUDGET_EXHAUSTED',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
