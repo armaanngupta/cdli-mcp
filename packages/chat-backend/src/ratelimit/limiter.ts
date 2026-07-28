@@ -17,7 +17,13 @@ function keyGenerator(req: Request): string {
 }
 
 function makeLimiter(max: number) {
-  return rateLimit({ windowMs: WINDOW_MS, max, standardHeaders: true, legacyHeaders: false, keyGenerator });
+  return rateLimit({
+    windowMs: WINDOW_MS,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator,
+  });
 }
 
 const anonByomLimiter = makeLimiter(ANON_BYOM_PER_MINUTE);

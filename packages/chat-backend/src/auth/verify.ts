@@ -15,7 +15,10 @@ export function verifyIdentity(authHeader: string | undefined): Identity | null 
   try {
     const payload = jwt.verify(authHeader.slice(7), secret, { algorithms: ['HS256'] });
     if (typeof payload === 'string' || !payload.sub) return null;
-    return { userId: String(payload.sub), tier: typeof payload.tier === 'string' ? payload.tier : 'user' };
+    return {
+      userId: String(payload.sub),
+      tier: typeof payload.tier === 'string' ? payload.tier : 'user',
+    };
   } catch {
     return null;
   }
