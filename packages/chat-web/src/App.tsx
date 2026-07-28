@@ -13,6 +13,18 @@ import type { StoredKey } from './crypto/byomKey';
 
 const PROVIDERS = ['mistral', 'groq', 'google', 'anthropic', 'openai'];
 
+const CUSTOM_MODEL = '__custom__';
+
+// Curated per-provider picks (mirrors chat-backend's DEFAULT_MODEL plus a couple of alternates).
+// Not exhaustive — "Custom…" covers anything else the provider offers.
+const MODEL_OPTIONS: Record<string, string[]> = {
+  mistral: ['mistral-small-latest', 'mistral-large-latest', 'codestral-latest'],
+  groq: ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b', 'llama-3.1-8b-instant'],
+  google: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'],
+  anthropic: ['claude-haiku-4-5', 'claude-sonnet-5', 'claude-opus-4-8'],
+  openai: ['gpt-5-mini', 'gpt-5', 'gpt-5-nano'],
+};
+
 interface ToolCall {
   name: string;
   status: ToolStatus;
@@ -30,6 +42,7 @@ export function App() {
   const [draft, setDraft] = useState('');
   const [provider, setProvider] = useState('mistral');
   const [model, setModel] = useState('');
+  const [customModel, setCustomModel] = useState(false);
   const [storedKey, setStoredKey] = useState<StoredKey | null>(null);
   const [unlockedKey, setUnlockedKey] = useState('');
   const [newKeyInput, setNewKeyInput] = useState('');
@@ -144,7 +157,11 @@ export function App() {
             <select
               id="provider"
               value={provider}
-              onChange={(e) => setProvider(e.target.value)}
+              onChange={(e) => {
+                setProvider(e.target.value);
+                setModel('');
+                setCustomModel(false);
+              }}
               disabled={busy}
             >
               {PROVIDERS.map((p) => (
@@ -153,15 +170,39 @@ export function App() {
                 </option>
               ))}
             </select>
-            <label htmlFor="model">Model (optional)</label>
-            <input
+            <label htmlFor="model">Model</label>
+            <select
               id="model"
-              type="text"
-              placeholder="provider default"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
+              value={customModel ? CUSTOM_MODEL : model}
+              onChange={(e) => {
+                if (e.target.value === CUSTOM_MODEL) {
+                  setCustomModel(true);
+                  setModel('');
+                } else {
+                  setCustomModel(false);
+                  setModel(e.target.value);
+                }
+              }}
               disabled={busy}
-            />
+            >
+              <option value="">Provider default</option>
+              {MODEL_OPTIONS[provider]?.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+              <option value={CUSTOM_MODEL}>Custom…</option>
+            </select>
+            {customModel && (
+              <input
+                id="model-custom"
+                type="text"
+                placeholder="exact model id"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                disabled={busy}
+              />
+            )}
             {!storedKey && !unlockedKey && (
               <>
                 <label htmlFor="apikey">API key</label>
