@@ -1,13 +1,28 @@
+from typing import Any
+
+from langchain_core.runnables import RunnableConfig
+
+from agent_paper.mcp_client import client_from, search_artifacts
 from agent_paper.state import PaperState
 
-STUB_CANDIDATE_COUNT = 12
+CANDIDATES_PER_QUERY = 25
 
 
-def discover(state: PaperState) -> dict:
-    """Node 1 — turn the topic into 1-3 broad searches, collect candidate artifact ids.
+async def discover(state: PaperState, config: RunnableConfig) -> dict:
+    """Node 1 — run 1-3 broad searches and collect candidate artifacts.
 
-    STUB: the real node asks the model for queries and runs them through `advanced_search`.
+    The queries are the caller's filters verbatim for now; generating them from the topic
+    is the LLM step. Everything downstream is already shaped for several queries, so that
+    change lands here alone.
     """
-    queries = [state["topic"]]
-    artifact_ids = [f"P{100000 + i:06d}" for i in range(STUB_CANDIDATE_COUNT)]
-    return {"queries": queries, "artifact_ids": artifact_ids}
+    queries = [state["filters"]] if state["filters"] else []
+    if not queries:
+        raise ValueError("No search filters supplied — pass at least one, e.g. provenience=Lagash")
+
+    client = client_from(config)
+    cards: dict[str, dict[str, Any]] = {}
+    for query in queries:
+        for card in await search_artifacts(client, query, limit=CANDIDATES_PER_QUERY):
+            cards[card["p_number"]] = card
+
+    return {"queries": queries, "cards": cards, "artifact_ids": sorted(cards)}

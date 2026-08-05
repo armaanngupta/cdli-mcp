@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import Any, TypedDict
 
 
 class Theme(TypedDict):
@@ -15,8 +15,14 @@ class PaperState(TypedDict):
     """
 
     topic: str
-    queries: list[str]
+    # Search filters for node 1. Supplied by the caller for now; node 1 will generate them
+    # from the topic once the LLM step lands.
+    filters: dict[str, str]
+    queries: list[dict[str, str]]
     artifact_ids: list[str]
+    # p_number -> the artifact summary card from advanced_search. Carried forward so later
+    # nodes read metadata without re-fetching it per artifact.
+    cards: dict[str, dict[str, Any]]
     ranked_ids: list[str]
     # artifact id -> ~3-sentence summary. Raw transliteration is discarded at ingestion
     # so it never reaches the synthesis context.
@@ -29,11 +35,13 @@ class PaperState(TypedDict):
     unverified_citations: list[str]
 
 
-def initial_state(topic: str) -> PaperState:
+def initial_state(topic: str, filters: dict[str, str] | None = None) -> PaperState:
     return PaperState(
         topic=topic,
+        filters=filters or {},
         queries=[],
         artifact_ids=[],
+        cards={},
         ranked_ids=[],
         summaries={},
         themes=[],

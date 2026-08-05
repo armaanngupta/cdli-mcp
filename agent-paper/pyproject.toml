@@ -5,6 +5,7 @@ description = "CDLI research-paper generation agent — LangGraph state machine 
 requires-python = ">=3.11"
 dependencies = [
     "langgraph>=0.6",
+    "mcp>=2.0.0",
 ]
 
 [project.scripts]
