@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { streamChat } from './api/chat';
 import type { ChatMessage, ToolStatus } from './api/chat';
+import { streamPaper } from './api/paper';
+import type { NodeStatus } from './api/paper';
 import { MessageView } from './components/MessageView';
 import {
   clearEncryptedKey,
@@ -29,9 +31,17 @@ const MODEL_OPTIONS: Record<string, string[]> = {
   openai: ['gpt-5-mini', 'gpt-5', 'gpt-5-nano'],
 };
 
+const PAPER_COMMAND = '/paper';
+
 interface ToolCall {
   name: string;
   status: ToolStatus;
+}
+
+interface PaperNode {
+  name: string;
+  status: NodeStatus;
+  detail: string;
 }
 
 function upsertTool(calls: ToolCall[], name: string, status: ToolStatus): ToolCall[] {
@@ -39,6 +49,28 @@ function upsertTool(calls: ToolCall[], name: string, status: ToolStatus): ToolCa
   const last = calls.map((c) => c.name).lastIndexOf(name);
   if (last === -1) return calls;
   return calls.map((c, i) => (i === last ? { ...c, status } : c));
+}
+
+function describeProgress(progress?: Record<string, unknown>): string {
+  if (!progress) return '';
+  return Object.entries(progress)
+    .map(([key, value]) => `${key}=${String(value)}`)
+    .join(' ');
+}
+
+// A finished node with no pending row appends rather than replacing, so the re-scoping
+// loop shows each pass instead of collapsing into one line.
+function upsertNode(
+  nodes: PaperNode[],
+  name: string,
+  status: NodeStatus,
+  detail: string,
+): PaperNode[] {
+  const pending = nodes.findIndex((n) => n.name === name && n.status === 'started');
+  if (status === 'finished' && pending !== -1) {
+    return nodes.map((n, i) => (i === pending ? { name, status, detail } : n));
+  }
+  return [...nodes, { name, status, detail }];
 }
 
 export function App() {
@@ -54,6 +86,7 @@ export function App() {
   const [keyError, setKeyError] = useState<string | null>(null);
   const [streamedText, setStreamedText] = useState<string | null>(null);
   const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
+  const [paperNodes, setPaperNodes] = useState<PaperNode[]>([]);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -100,11 +133,55 @@ export function App() {
     setKeyError(null);
   }
 
+  async function runPaper(userLine: string, topic: string) {
+    if (!topic) {
+      setError('Give /paper a topic — e.g. “/paper temple offerings at Girsu”.');
+      return;
+    }
+
+    setMessages((prev) => [...prev, { role: 'user', content: userLine }]);
+    setDraft('');
+    setError(null);
+    setPaperNodes([]);
+    // No token deltas on a paper run, so this only marks the app busy; the draft arrives
+    // whole in the done event.
+    setStreamedText('');
+
+    let finished = '';
+    try {
+      await streamPaper(
+        { topic, provider, byomKey: unlockedKey, model: model.trim() || undefined },
+        {
+          onNode: (name, status, progress) =>
+            setPaperNodes((prev) => upsertNode(prev, name, status, describeProgress(progress))),
+          onDone: (markdown, unverified) => {
+            finished = markdown;
+            if (unverified.length) {
+              setError(`Draft cites artifacts that were never ingested: ${unverified.join(', ')}`);
+            }
+          },
+          onError: (message) => setError(message),
+        },
+      );
+    } catch (err) {
+      setError(String(err));
+    }
+
+    if (finished) setMessages((prev) => [...prev, { role: 'assistant', content: finished }]);
+    setStreamedText(null);
+    setPaperNodes([]);
+  }
+
   async function send() {
     const content = draft.trim();
     if (!content || busy) return;
     if (!unlockedKey) {
       setError('Unlock your API key first.');
+      return;
+    }
+
+    if (content.startsWith(PAPER_COMMAND)) {
+      await runPaper(content, content.slice(PAPER_COMMAND.length).trim());
       return;
     }
 
@@ -234,8 +311,8 @@ export function App() {
                 <button onClick={() => void saveKey()}>Save key</button>
                 <p className="key-hint">
                   Encrypted with your PIN and kept only in this browser. Once unlocked it lives in
-                  memory for this tab and is sent directly to your chosen provider with each
-                  message — never stored on our server.
+                  memory for this tab and is sent directly to your chosen provider with each message
+                  — never stored on our server.
                 </p>
               </>
             )}
@@ -270,6 +347,9 @@ export function App() {
               {messages.length === 0 && streamedText === null && (
                 <p className="empty">
                   Ask about the cuneiform corpus — e.g. “Find Ur III tablets from Nippur”.
+                  <br />
+                  Or write a research note with <code>/paper</code> — e.g. “/paper temple offerings
+                  at Girsu”. A paper run takes a few minutes.
                 </p>
               )}
               {messages.map((m, i) => (
@@ -277,6 +357,12 @@ export function App() {
               ))}
               {streamedText !== null && (
                 <>
+                  {paperNodes.map((n, i) => (
+                    <div key={`node-${i}`} className={`tool tool-${n.status}`}>
+                      {n.status === 'started' ? '⚙ running' : '✓'} <code>{n.name}</code>
+                      {n.detail && <span className="node-detail"> {n.detail}</span>}
+                    </div>
+                  ))}
                   {toolCalls.map((t, i) => (
                     <div key={i} className={`tool tool-${t.status}`}>
                       {t.status === 'started' ? '⚙ calling' : t.status === 'finished' ? '✓' : '✕'}{' '}
@@ -298,7 +384,7 @@ export function App() {
             <div className="composer-col">
               <textarea
                 value={draft}
-                placeholder="Ask a question…"
+                placeholder="Ask a question, or /paper <topic>…"
                 rows={2}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {

@@ -233,6 +233,11 @@ body {
   font-size: 0.8rem;
 }
 
+/* Per-node counts on a /paper run — secondary to the node name itself. */
+.node-detail {
+  opacity: 0.7;
+}
+
 .error {
   align-self: stretch;
   color: var(--danger);
