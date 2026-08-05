@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import type { NextFunction, Request, Response } from 'express';
 import type { Identity } from '../auth/verify.js';
 
@@ -13,7 +13,13 @@ const USER_FUNDED_PER_MINUTE = 5;
 
 function keyGenerator(req: Request): string {
   const identity = req.identity;
-  return identity ? `user:${identity.userId}` : `ip:${req.ip}`;
+  if (identity) return `user:${identity.userId}`;
+  // A single IPv6 address is not a single client: providers hand out whole prefixes, so
+  // keying on the exact address lets one user cycle through addresses they already own and
+  // bypass the limit. ipKeyGenerator collapses IPv6 to its /56; IPv4 passes through
+  // unchanged. `req.ip` is undefined when Express cannot determine it — those requests
+  // then share one bucket, which limits them together rather than not at all.
+  return `ip:${ipKeyGenerator(req.ip ?? '')}`;
 }
 
 function makeLimiter(max: number) {
