@@ -5,3 +5,11 @@ node_modules/
 dist/
 .env
 *.tsbuildinfo
+
+# Python (agent-paper). Kept here rather than in agent-paper/ so the rules apply on
+# every branch, including ones where that directory doesn't exist yet.
+__pycache__/
+*.pyc
+.venv/
+.ruff_cache/
+*.egg-info/
