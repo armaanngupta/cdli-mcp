@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { runAgentTurn } from '../agent/loop.js';
 import { verifyIdentity } from '../auth/verify.js';
 import type { Identity } from '../auth/verify.js';
+import { trimToBudget } from '../context/window.js';
 import { resolveCredentials } from '../llm/credentials.js';
 import { PROVIDERS } from '../llm/provider.js';
 import { applyRateLimit } from '../ratelimit/limiter.js';
@@ -81,7 +82,7 @@ async function handleTurn(
     const result = await withTiming('message', () =>
       runAgentTurn(
         credentials.model,
-        messages,
+        trimToBudget(messages),
         {
           onToken: (text) => sendEvent(res, 'token', { text }),
           onTool: (name, status) => sendEvent(res, 'tool', { name, status }),
