@@ -1,4 +1,4 @@
-import { getEncoding } from 'js-tiktoken';
+  import { getEncoding } from 'js-tiktoken';
 import type { ChatMessage } from '../routes/message.js';
 
 // Plan §9.3: ~8-12k tokens of history+results. cl100k_base is a cross-provider approximation

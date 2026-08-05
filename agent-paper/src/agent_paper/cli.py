@@ -2,20 +2,10 @@ import argparse
 import asyncio
 import os
 
-from agent_paper.graph import build_graph
-from agent_paper.llm import DEFAULT_MODEL, DEFAULT_PROVIDER, build_model
-from agent_paper.mcp_client import connect, mcp_url
-from agent_paper.state import PaperState, initial_state
-
-
-def _describe(patch: dict) -> str:
-    """Compact one-line view of what a node changed — the same signal the SSE
-    progress events will carry once the service exists."""
-    parts = []
-    for key, value in patch.items():
-        size = len(value) if isinstance(value, (list, dict, str)) else value
-        parts.append(f"{key}={size}")
-    return " ".join(parts)
+from agent_paper.llm import DEFAULT_MODEL, DEFAULT_PROVIDER
+from agent_paper.mcp_client import mcp_url
+from agent_paper.runner import describe_patch, stream_run
+from agent_paper.state import PaperState
 
 
 def _parse_filters(pairs: list[str]) -> dict[str, str]:
@@ -28,25 +18,11 @@ def _parse_filters(pairs: list[str]) -> dict[str, str]:
     return filters
 
 
-async def run(
-    topic: str,
-    filters: dict[str, str],
-    provider: str = DEFAULT_PROVIDER,
-    api_key: str = "",
-    model_name: str = DEFAULT_MODEL,
-) -> PaperState:
-    graph = build_graph()
-    state = initial_state(topic, filters)
-    model = build_model(provider, api_key, model_name)
-
-    # One connection for the whole run, shared with every node through the graph config.
-    async with connect() as client:
-        config = {"configurable": {"mcp_client": client, "model": model}}
-        async for update in graph.astream(state, config, stream_mode="updates"):
-            for node_name, patch in update.items():
-                state.update(patch)
-                print(f"[{node_name:<10}] {_describe(patch)}")
-
+async def run(topic: str, filters: dict[str, str], provider: str, key: str, model: str):
+    state: PaperState | None = None
+    async for node_name, patch, state in stream_run(topic, filters, provider, key, model):
+        described = " ".join(f"{k}={v}" for k, v in describe_patch(patch).items())
+        print(f"[{node_name:<10}] {described}")
     return state
 
 
