@@ -13,6 +13,10 @@ import type { StoredKey } from './crypto/byomKey';
 
 const PROVIDERS = ['mistral', 'groq', 'google', 'anthropic', 'openai'];
 
+// Coarse cap on what's sent to the backend, purely to avoid shipping a huge payload on a very
+// long session — the backend applies the real token budget (chat-backend/src/context/window.ts).
+const MAX_SENT_MESSAGES = 40;
+
 const CUSTOM_MODEL = '__custom__';
 
 // Curated per-provider picks (mirrors chat-backend's DEFAULT_MODEL plus a couple of alternates).
@@ -114,7 +118,12 @@ export function App() {
     let acc = '';
     try {
       await streamChat(
-        { messages: history, provider, byomKey: unlockedKey, model: model.trim() || undefined },
+        {
+          messages: history.slice(-MAX_SENT_MESSAGES),
+          provider,
+          byomKey: unlockedKey,
+          model: model.trim() || undefined,
+        },
         {
           onToken: (text) => {
             acc += text;
