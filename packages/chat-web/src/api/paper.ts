@@ -13,6 +13,8 @@ export interface PaperRequest {
 
 export interface PaperHandlers {
   onNode: (name: string, status: NodeStatus, progress?: Record<string, unknown>) => void;
+  /** Synthesis is much the longest node, so it reports each finished section from inside. */
+  onSection: (label: string, index: number, of: number) => void;
   onDone: (draft: string, unverifiedCitations: string[], artifactIds: string[]) => void;
   onError: (message: string) => void;
 }
@@ -21,6 +23,9 @@ interface EventPayload {
   name?: string;
   status?: NodeStatus;
   progress?: Record<string, unknown>;
+  section?: string;
+  index?: number;
+  of?: number;
   draft?: string;
   unverified_citations?: string[];
   artifact_ids?: string[];
@@ -56,6 +61,9 @@ function dispatch(frame: SseFrame, handlers: PaperHandlers): void {
   switch (frame.event) {
     case 'node':
       handlers.onNode(payload.name ?? 'node', payload.status ?? 'finished', payload.progress);
+      break;
+    case 'section':
+      handlers.onSection(payload.section ?? '', payload.index ?? 0, payload.of ?? 0);
       break;
     case 'done':
       handlers.onDone(
