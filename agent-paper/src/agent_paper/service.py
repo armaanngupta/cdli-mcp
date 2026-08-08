@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from agent_paper.llm import DEFAULT_MODEL, DEFAULT_PROVIDER
-from agent_paper.runner import describe_patch, stream_run
+from agent_paper.runner import stream_run
 
 log = logging.getLogger(__name__)
 
@@ -51,17 +51,17 @@ async def paper(request: PaperRequest) -> EventSourceResponse:
         state = None
         try:
             yield _event("node", {"name": "discovery", "status": "started"})
-            async for node_name, patch, state in stream_run(
+            async for kind, payload, state in stream_run(
                 request.topic,
                 request.filters,
                 request.provider,
                 request.api_key,
                 request.model,
             ):
-                yield _event(
-                    "node",
-                    {"name": node_name, "status": "finished", "progress": describe_patch(patch)},
-                )
+                if kind == "section":
+                    yield _event("section", payload)
+                else:
+                    yield _event("node", {**payload, "status": "finished"})
             yield _event(
                 "done",
                 {

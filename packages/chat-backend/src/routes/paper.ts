@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { verifyIdentity } from '../auth/verify.js';
-import { PROVIDERS } from '../llm/provider.js';
+import { PROVIDERS, defaultModelFor } from '../llm/provider.js';
 import type { Provider } from '../llm/provider.js';
 import { applyRateLimit } from '../ratelimit/limiter.js';
 import { ChatError, ErrorCode, sendError } from '../util/errors.js';
@@ -18,6 +18,9 @@ const LANGCHAIN_PROVIDER: Record<Provider, string> = {
   google: 'google_genai',
   mistral: 'mistralai',
   groq: 'groq',
+  // Not a LangChain provider id — the agent's build_model recognizes it and configures the
+  // OpenAI client with OpenRouter's base URL.
+  openrouter: 'openrouter',
 };
 
 const bodySchema = z.object({
@@ -76,7 +79,10 @@ async function proxyRun(res: Response, body: ParsedBody): Promise<void> {
         topic: body.topic,
         api_key: body.byomKey,
         provider: LANGCHAIN_PROVIDER[body.provider],
-        ...(body.model ? { model: body.model } : {}),
+        // Always send an explicit model: the agent's own fallback is Mistral-shaped, so an
+        // unspecified model on any other provider would otherwise be wrong. This backend's
+        // per-provider default is the one the UI mirrors, so it is the source of truth.
+        model: body.model ?? defaultModelFor(body.provider),
         ...(body.filters ? { filters: body.filters } : {}),
       }),
       signal: abort.signal,

@@ -2,9 +2,8 @@ import asyncio
 from typing import Any
 
 from langchain_core.runnables import RunnableConfig
-from pydantic import BaseModel, Field
 
-from agent_paper.llm import ask
+from agent_paper.llm import ask_text
 from agent_paper.mcp_client import client_from, fetch_inscription
 from agent_paper.state import PaperState
 
@@ -26,10 +25,6 @@ State what the text is and what it records. Note anything bearing on the topic. 
 speculate beyond the evidence, and do not repeat the catalogue fields verbatim."""
 
 NO_INSCRIPTION = "(no transliteration available — describe from the catalogue record alone)"
-
-
-class Summary(BaseModel):
-    text: str = Field(description="About three sentences")
 
 
 def _render_record(card: dict[str, Any]) -> str:
@@ -60,16 +55,15 @@ async def ingest(state: PaperState, config: RunnableConfig) -> dict:
     async def summarize(artifact_id: str) -> tuple[str, str]:
         card = cards[artifact_id]
         atf = await fetch_inscription(client, artifact_id) if card["has_inscription"] else None
-        summary = await ask(
+        summary = await ask_text(
             config,
-            Summary,
             PROMPT.format(
                 topic=state["topic"],
                 record=_render_record(card),
                 atf=atf[:MAX_ATF_CHARS] if atf else NO_INSCRIPTION,
             ),
         )
-        return artifact_id, summary.text
+        return artifact_id, summary
 
     pairs = await asyncio.gather(*(summarize(i) for i in state["ranked_ids"]))
     return {"summaries": dict(pairs)}

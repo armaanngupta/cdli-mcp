@@ -13,7 +13,7 @@ import {
 } from './crypto/byomKey';
 import type { StoredKey } from './crypto/byomKey';
 
-const PROVIDERS = ['mistral', 'groq', 'google', 'anthropic', 'openai'];
+const PROVIDERS = ['mistral', 'groq', 'google', 'anthropic', 'openai', 'openrouter'];
 
 // Coarse cap on what's sent to the backend, purely to avoid shipping a huge payload on a very
 // long session — the backend applies the real token budget (chat-backend/src/context/window.ts).
@@ -29,6 +29,9 @@ const MODEL_OPTIONS: Record<string, string[]> = {
   google: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'],
   anthropic: ['claude-haiku-4-5', 'claude-sonnet-5', 'claude-opus-4-8'],
   openai: ['gpt-5-mini', 'gpt-5', 'gpt-5-nano'],
+  // OpenRouter model ids are vendor-namespaced; one key reaches every vendor. "Custom…"
+  // covers the full catalogue.
+  openrouter: ['openai/gpt-4o-mini', 'anthropic/claude-3.5-sonnet', 'google/gemini-2.0-flash-001'],
 };
 
 const PAPER_COMMAND = '/paper';
@@ -154,6 +157,10 @@ export function App() {
         {
           onNode: (name, status, progress) =>
             setPaperNodes((prev) => upsertNode(prev, name, status, describeProgress(progress))),
+          onSection: (label, index, of) =>
+            setPaperNodes((prev) =>
+              upsertNode(prev, 'section', 'finished', `${index}/${of} ${label}`),
+            ),
           onDone: (markdown, unverified) => {
             finished = markdown;
             if (unverified.length) {

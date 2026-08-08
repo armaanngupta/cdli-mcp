@@ -4,7 +4,7 @@ import os
 
 from agent_paper.llm import DEFAULT_MODEL, DEFAULT_PROVIDER
 from agent_paper.mcp_client import mcp_url
-from agent_paper.runner import describe_patch, stream_run
+from agent_paper.runner import stream_run
 from agent_paper.state import PaperState
 
 
@@ -20,9 +20,12 @@ def _parse_filters(pairs: list[str]) -> dict[str, str]:
 
 async def run(topic: str, filters: dict[str, str], provider: str, key: str, model: str):
     state: PaperState | None = None
-    async for node_name, patch, state in stream_run(topic, filters, provider, key, model):
-        described = " ".join(f"{k}={v}" for k, v in describe_patch(patch).items())
-        print(f"[{node_name:<10}] {described}")
+    async for kind, payload, state in stream_run(topic, filters, provider, key, model):
+        if kind == "section":
+            print(f"[section   ] {payload['index']}/{payload['of']} {payload['section']}")
+            continue
+        described = " ".join(f"{k}={v}" for k, v in payload["progress"].items())
+        print(f"[{payload['name']:<10}] {described}")
     return state
 
 

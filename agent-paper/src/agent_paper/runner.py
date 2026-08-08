@@ -26,10 +26,12 @@ async def stream_run(
     api_key: str = "",
     model_name: str = DEFAULT_MODEL,
 ) -> AsyncIterator[tuple[str, dict[str, Any], PaperState]]:
-    """Run the pipeline, yielding (node name, patch, running state) as each node finishes.
+    """Run the pipeline, yielding (kind, payload, running state) as progress arrives.
 
-    Nodes are the only progress signal a paper run has: a run takes minutes and produces
-    nothing user-visible until synthesis, so callers stream these rather than wait.
+    Two kinds: "node" when a graph node finishes, and "section" when synthesis completes one
+    section of the draft. A run takes minutes and produces nothing user-visible until the
+    draft exists, so callers stream these rather than wait — and synthesis is much the
+    longest node, which is why it reports from inside.
     """
     graph = build_graph()
     state = initial_state(topic, filters or {})
@@ -38,7 +40,10 @@ async def stream_run(
     # One connection for the whole run, shared with every node through the graph config.
     async with connect() as client:
         config = {"configurable": {"mcp_client": client, "model": model}}
-        async for update in graph.astream(state, config, stream_mode="updates"):
-            for node_name, patch in update.items():
+        async for mode, chunk in graph.astream(state, config, stream_mode=["updates", "custom"]):
+            if mode == "custom":
+                yield "section", chunk, state
+                continue
+            for node_name, patch in chunk.items():
                 state.update(patch)
-                yield node_name, patch, state
+                yield "node", {"name": node_name, "progress": describe_patch(patch)}, state
