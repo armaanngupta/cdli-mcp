@@ -43,7 +43,11 @@ export async function encryptApiKey(plaintext: string, pin: string): Promise<Sto
     key,
     new TextEncoder().encode(plaintext),
   );
-  return { salt: toBase64(salt), iv: toBase64(iv), ciphertext: toBase64(new Uint8Array(ciphertext)) };
+  return {
+    salt: toBase64(salt),
+    iv: toBase64(iv),
+    ciphertext: toBase64(new Uint8Array(ciphertext)),
+  };
 }
 
 // Throws (DOMException from AES-GCM tag check) on a wrong PIN — callers treat any rejection as "wrong PIN".

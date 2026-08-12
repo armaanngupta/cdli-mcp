@@ -1,3 +1,6 @@
+import { failureMessage, readSse } from './sse';
+import type { SseFrame } from './sse';
+
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -40,39 +43,16 @@ export async function streamChat(
   });
 
   if (!res.ok || !res.body) {
-    const body: { error?: { message?: string } } | null = await res.json().catch(() => null);
-    handlers.onError(body?.error?.message ?? `Request failed (${res.status})`);
+    handlers.onError(await failureMessage(res));
     return;
   }
 
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    let sep = buffer.indexOf('\n\n');
-    while (sep !== -1) {
-      dispatch(buffer.slice(0, sep), handlers);
-      buffer = buffer.slice(sep + 2);
-      sep = buffer.indexOf('\n\n');
-    }
-  }
+  await readSse(res.body, (frame) => dispatch(frame, handlers));
 }
 
-function dispatch(frame: string, handlers: StreamHandlers): void {
-  let event = '';
-  let data = '';
-  for (const line of frame.split('\n')) {
-    if (line.startsWith('event: ')) event = line.slice(7);
-    else if (line.startsWith('data: ')) data += line.slice(6);
-  }
-  if (!event || !data) return;
-
-  const payload = JSON.parse(data) as EventPayload;
-  switch (event) {
+function dispatch(frame: SseFrame, handlers: StreamHandlers): void {
+  const payload = JSON.parse(frame.data) as EventPayload;
+  switch (frame.event) {
     case 'token':
       handlers.onToken(payload.text ?? '');
       break;

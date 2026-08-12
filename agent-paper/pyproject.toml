@@ -1,0 +1,38 @@
+[project]
+name = "agent-paper"
+version = "0.1.0"
+description = "CDLI research-paper generation agent — LangGraph state machine behind the chat interface's /paper command"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.141.1",
+    "langchain>=1.3.14",
+    "langchain-anthropic>=1.5.3",
+    "langchain-google-genai>=4.3.2",
+    "langchain-groq>=1.1.3",
+    "langchain-mistralai>=1.1.6",
+    "langchain-openai>=1.4.1",
+    "langgraph>=0.6",
+    "markdown>=3.10.3",
+    "mcp>=2.0.0",
+    "uvicorn>=0.52.1",
+    "xhtml2pdf>=0.2.17",
+]
+
+[project.scripts]
+agent-paper = "agent_paper.cli:main"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_paper"]
+
+[tool.ruff]
+line-length = 100
+src = ["src"]

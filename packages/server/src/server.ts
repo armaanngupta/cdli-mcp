@@ -6,6 +6,7 @@ import { registerCqpQuery } from './tools/cqp_query.js';
 import { registerGetBibliography } from './tools/get_bibliography.js';
 import { registerGetInscription } from './tools/get_inscription.js';
 import { registerGetMetadata } from './tools/get_metadata.js';
+import { registerResearchPaperPrompt } from './prompts/research_paper.js';
 import { registerPing } from './tools/ping.js';
 import { registerSearchEntity } from './tools/search_entity.js';
 
@@ -24,6 +25,7 @@ export function createServer(): McpServer {
   registerCqpQuery(server);
   registerInscriptionApp(server);
   registerArtifactCardApp(server);
+  registerResearchPaperPrompt(server);
 
   return server;
 }
