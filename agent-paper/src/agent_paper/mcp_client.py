@@ -59,6 +59,22 @@ async def fetch_inscription(client: Client, artifact_id: str) -> str | None:
     return body
 
 
+async def list_entities(client: Client, entity: str) -> list[dict[str, Any]]:
+    """List a CDLI entity type — e.g. every language, period, or provenience in the catalogue.
+
+    This is how the discovery agent learns the corpus's real structure instead of inferring
+    it from a handful of sampled artifacts.
+    """
+    texts = await _call(client, "get_metadata", {"entity": entity})
+    data = json.loads(texts[0])
+    return data if isinstance(data, list) else [data]
+
+
+async def fetch_bibliography(client: Client, artifact_id: str) -> str:
+    texts = await _call(client, "get_bibliography", {"id": artifact_id})
+    return texts[0] if texts else "(no bibliography)"
+
+
 def client_from(config: RunnableConfig) -> Client:
     """Pull the shared client out of the graph config, so one connection serves a whole run."""
     return config["configurable"]["mcp_client"]
