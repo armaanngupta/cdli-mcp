@@ -4,6 +4,8 @@ from langgraph.config import get_stream_writer
 from agent_paper.llm import ask_text
 from agent_paper.state import PaperState, Theme
 
+_TITLE_MINOR_WORDS = {"a", "an", "the", "of", "at", "in", "on", "and", "or", "for", "to", "with"}
+
 # A whole paper written in one call is capped by the model's max output tokens, which is why
 # single-call drafts landed near 5k characters whatever the topic. Writing a section at a
 # time gives each its own output budget, and lets each see more evidence than a whole-paper
@@ -36,16 +38,25 @@ Requirements:
   invent an id to fill space.
 - Say plainly where the evidence is thin rather than overstating it."""
 
-INTRO_PROMPT = """Write the opening framing of a research note on:
+INTRO_PROMPT = """Write the title and opening of a research note on:
 
 "{topic}"
 
 The sections that follow are:
 {outline}
+{context}
+The note draws only on these artifacts:
+{summaries}
 
-Write 2-3 paragraphs of Markdown with no heading. Set out what the corpus is, what the note
-argues, and what {artifact_count} artifacts can and cannot show. Cite P-numbers only where
-you make a specific claim about an artifact."""
+Begin with a concise, specific scholarly title as a single Markdown H1 (`# ...`) — a real
+title, not the raw topic phrase. Then write 2-3 framing paragraphs with no further heading:
+what the corpus is, what the note argues, and what {artifact_count} artifacts can and cannot
+show. If corpus context is given above, use it to frame the scope honestly (e.g. how the
+sampled artifacts sit within the catalogue's full range).
+- Cite a P-number only for a specific claim about a listed artifact, copied exactly.
+- The artifacts above are the ONLY ones that exist in this study. Never mention or cite any
+  other P-number, and never describe an artifact that is not listed — inventing an example
+  invalidates the paper."""
 
 CONCLUSION_PROMPT = """Write the conclusion of a research note on:
 
@@ -54,9 +65,12 @@ CONCLUSION_PROMPT = """Write the conclusion of a research note on:
 The sections were:
 {outline}
 
+It drew only on these artifacts:
+{summaries}
+
 Write 1-2 paragraphs of Markdown under a `## Conclusion` heading. Draw the threads together
-and be explicit about the limits of a study resting on {artifact_count} artifacts. Do not
-introduce evidence the sections did not discuss."""
+and be explicit about the limits of a study resting on {artifact_count} artifacts. Cite only
+the P-numbers listed above, and introduce no evidence the sections did not discuss."""
 
 
 def _evidence_for(state: PaperState, theme: Theme) -> str:
@@ -66,6 +80,41 @@ def _evidence_for(state: PaperState, theme: Theme) -> str:
 
 def _outline(themes: list[Theme]) -> str:
     return "\n".join(f"{i + 1}. {theme['label']}" for i, theme in enumerate(themes))
+
+
+def _all_evidence(state: PaperState) -> str:
+    return "\n\n".join(f"{pid}: {text}" for pid, text in state["summaries"].items())
+
+
+def _context_block(state: PaperState) -> str:
+    findings = state.get("context_findings") or []
+    if not findings:
+        return ""
+    joined = "\n".join(f"- {f}" for f in findings)
+    return f"\nCorpus context gathered from the catalogue:\n{joined}\n"
+
+
+def _titlecase(topic: str) -> str:
+    words = topic.split()
+    return " ".join(
+        w if i and w.lower() in _TITLE_MINOR_WORDS else w[:1].upper() + w[1:]
+        for i, w in enumerate(words)
+    )
+
+
+def _ensure_title(intro: str, topic: str) -> str:
+    """Guarantee the intro opens with a clean H1 title.
+
+    The model usually supplies one but sometimes wraps it in emphasis (`# *Title*`), which
+    renders as an italic heading; and it may omit the heading entirely, which would leave the
+    paper untitled. Normalize the former and fall back to the topic for the latter.
+    """
+    stripped = intro.lstrip()
+    if stripped.startswith("# "):
+        head, _, rest = stripped.partition("\n")
+        title = head[2:].strip().strip("*_").strip()
+        return f"# {title}\n{rest}"
+    return f"# {_titlecase(topic)}\n\n{intro}"
 
 
 async def synthesize(state: PaperState, config: RunnableConfig) -> dict:
@@ -105,16 +154,31 @@ async def synthesize(state: PaperState, config: RunnableConfig) -> dict:
         sections.append(section)
         emit({"section": theme["label"], "index": position, "of": len(themes)})
 
+    # Intro and conclusion are written last and, crucially, are given the same evidence and
+    # valid-id whitelist the sections had. Written blind to the evidence (as they once were),
+    # the intro invents illustrative artifacts and citations that read convincingly — the
+    # single worst failure this pipeline had. The intro also supplies the paper's real title.
+    evidence = _all_evidence(state)
+    context = _context_block(state)
     intro = await ask_text(
         config,
-        INTRO_PROMPT.format(topic=state["topic"], outline=outline, artifact_count=artifact_count),
+        INTRO_PROMPT.format(
+            topic=state["topic"],
+            outline=outline,
+            context=context,
+            summaries=evidence,
+            artifact_count=artifact_count,
+        ),
     )
     conclusion = await ask_text(
         config,
         CONCLUSION_PROMPT.format(
-            topic=state["topic"], outline=outline, artifact_count=artifact_count
+            topic=state["topic"],
+            outline=outline,
+            summaries=evidence,
+            artifact_count=artifact_count,
         ),
     )
 
-    parts = [f"# {state['topic']}", intro, *sections, conclusion]
+    parts = [_ensure_title(intro, state["topic"]), *sections, conclusion]
     return {"draft": "\n\n".join(parts)}
