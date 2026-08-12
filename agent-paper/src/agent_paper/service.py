@@ -1,11 +1,12 @@
 import json
 import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from agent_paper.llm import DEFAULT_MODEL, DEFAULT_PROVIDER
+from agent_paper.pdf import render_pdf
 from agent_paper.runner import stream_run
 
 log = logging.getLogger(__name__)
@@ -82,3 +83,14 @@ async def paper(request: PaperRequest) -> EventSourceResponse:
         # response even if a proxy in front missed that config.
         headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache, no-transform"},
     )
+
+
+class PdfRequest(BaseModel):
+    # The finished Markdown the browser already holds — rendering it costs nothing, so a
+    # download never re-runs the (paid, minutes-long) pipeline.
+    markdown: str = Field(min_length=1)
+
+
+@app.post("/paper/pdf")
+def paper_pdf(request: PdfRequest) -> Response:
+    return Response(content=render_pdf(request.markdown), media_type="application/pdf")

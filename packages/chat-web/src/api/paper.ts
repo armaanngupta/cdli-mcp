@@ -3,6 +3,23 @@ import type { SseFrame } from './sse';
 
 export type NodeStatus = 'started' | 'finished';
 
+/** Render a finished paper's Markdown to a PDF and trigger a browser download. */
+export async function downloadPaperPdf(markdown: string, filename: string): Promise<void> {
+  const res = await fetch('/chat/api/paper/pdf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ markdown }),
+  });
+  if (!res.ok) throw new Error(await failureMessage(res));
+
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export interface PaperRequest {
   topic: string;
   provider: string;

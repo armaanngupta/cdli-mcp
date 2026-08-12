@@ -60,6 +60,39 @@ paperRouter.post('/chat/api/paper', (req: Request, res: Response) => {
   });
 });
 
+const pdfSchema = z.object({ markdown: z.string().min(1) });
+
+// PDF rendering makes no LLM calls, so it needs no key and no rate tier — the browser sends
+// back the finished draft it already holds and gets a formatted document.
+paperRouter.post('/chat/api/paper/pdf', (req: Request, res: Response) => {
+  const parsed = pdfSchema.safeParse(req.body);
+  if (!parsed.success) {
+    sendError(res, new ChatError(ErrorCode.INVALID_INPUT, 400, 'Missing markdown'));
+    return;
+  }
+  void proxyPdf(res, parsed.data.markdown);
+});
+
+async function proxyPdf(res: Response, markdown: string): Promise<void> {
+  let upstream: globalThis.Response;
+  try {
+    upstream = await fetch(`${PAPER_URL}/paper/pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ markdown }),
+    });
+  } catch (err) {
+    sendError(res, new ChatError(ErrorCode.UPSTREAM_ERROR, 502, `Paper agent unreachable: ${err}`));
+    return;
+  }
+  if (!upstream.ok) {
+    sendError(res, new ChatError(ErrorCode.UPSTREAM_ERROR, 502, 'PDF rendering failed'));
+    return;
+  }
+  res.setHeader('Content-Type', 'application/pdf');
+  res.send(Buffer.from(await upstream.arrayBuffer()));
+}
+
 async function proxyRun(res: Response, body: ParsedBody): Promise<void> {
   const abort = new AbortController();
   // 'close' also fires after a normal end — only a close before we finished is a disconnect.
