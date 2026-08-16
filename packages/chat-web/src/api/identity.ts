@@ -19,3 +19,31 @@ export async function fetchToken(): Promise<string | null> {
     return null;
   }
 }
+
+/**
+ * The display name inside a token, for the sidebar only.
+ *
+ * Read without verifying the signature — deliberately. Nothing here grants access; the
+ * backend verifies the same token by HMAC before spending anything, so a forged name would
+ * only mislabel the user's own screen.
+ */
+export function displayName(token: string | null): string | null {
+  if (!token) return null;
+  try {
+    // atob yields one char per byte, so a name outside ASCII ("Élise") arrives mojibaked
+    // unless the bytes are decoded as UTF-8 explicitly.
+    const binary = atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'));
+    const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+    const payload: unknown = JSON.parse(new TextDecoder().decode(bytes));
+    const claims = payload as Record<string, unknown>;
+    // `name` is the claim to add framework-side; the others are fallbacks so a signed-in
+    // user is never shown as anonymous just because the claim set differs.
+    for (const key of ['name', 'preferred_username', 'username', 'email', 'sub']) {
+      const value = claims[key];
+      if (typeof value === 'string' && value !== '') return value;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
