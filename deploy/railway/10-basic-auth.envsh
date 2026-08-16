@@ -9,7 +9,19 @@
 set -eu
 
 : "${PORT:=8080}"
-: "${DNS_RESOLVER:=8.8.8.8}"
+
+# nginx needs an explicit resolver because the upstreams live in variables (so one service
+# restarting cannot take nginx down with it). Railway does not document its internal DNS
+# address, so take whatever the platform already put in resolv.conf rather than making the
+# operator hunt for it. IPv6 addresses have to be bracketed in the resolver directive.
+if [ -z "${DNS_RESOLVER:-}" ]; then
+  DNS_RESOLVER=$(awk '/^nameserver/ { print $2; exit }' /etc/resolv.conf 2>/dev/null || true)
+  : "${DNS_RESOLVER:=8.8.8.8}"
+  case "$DNS_RESOLVER" in
+    *:*) DNS_RESOLVER="[$DNS_RESOLVER]" ;;
+  esac
+fi
+echo "dns resolver: $DNS_RESOLVER"
 
 if [ -n "${BASIC_AUTH:-}" ]; then
   printf '%s\n' "$BASIC_AUTH" > /etc/nginx/.htpasswd

@@ -43,8 +43,8 @@ the npm workspace lockfile lives at the root and the Node builds need it.
 ```
 CHAT_BACKEND_HOST = chat-backend.railway.internal:8090
 MCP_HOST          = mcp.railway.internal:3000
-DNS_RESOLVER      = fd12::10          # Railway's internal resolver; see note below
 BASIC_AUTH        = demo:$2y$05$...   # output of: htpasswd -nbB demo <password>
+DNS_RESOLVER      = (optional — auto-discovered from /etc/resolv.conf)
 ```
 
 **chat-backend**
@@ -78,9 +78,10 @@ already; uvicorn does not, which is why `agent-paper` takes a `HOST` variable. N
 environments support both, so you can usually leave it unset.
 
 **`DNS_RESOLVER`.** nginx resolves the upstreams at request time (they are held in variables,
-so one service restarting cannot take nginx down with it), and that needs a resolver address.
-Use Railway's internal DNS; if a lookup fails, `docker logs` on the web service will say so
-plainly. `8.8.8.8` is the fallback default but will not resolve `.railway.internal`.
+so one service restarting cannot take nginx down with it), and that needs an explicit
+resolver address. Railway does not document theirs, so the entrypoint reads it from the
+container's own `/etc/resolv.conf` and logs what it picked (`dns resolver: …` on the web
+service). Override it only if that turns out to be wrong.
 
 ---
 
