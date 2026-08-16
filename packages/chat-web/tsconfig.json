@@ -10,7 +10,9 @@
     "isolatedModules": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    // Declares Vite's asset-import modules, so `import logo from './assets/x.png'` typechecks.
+    "types": ["vite/client"]
   },
   "include": ["src"]
 }

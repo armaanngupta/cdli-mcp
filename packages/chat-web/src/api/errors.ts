@@ -48,6 +48,12 @@ export function classifyError(raw: string): FriendlyError {
     message = 'The service or corpus is unreachable right now. Please try again shortly.';
   } else if (has('timeout', 'timed out', 'etimedout')) {
     message = 'The request timed out — the corpus or model is slow right now. Try again.';
+  } else if (has('json_invalid', 'validationerror', 'invalid json', 'no json object')) {
+    // The paper pipeline asks for JSON and parses it; a model that annotates its output or
+    // writes prose inside the object surfaces here as a raw pydantic traceback.
+    message =
+      'The model returned a malformed response the pipeline could not read. Try again, or ' +
+      'pick a different model.';
   } else if (
     // Groq phrases a malformed tool call as "Failed to call a function".
     has('did not call a tool', 'tool_use_failed', 'tool choice', 'failed to call a function')

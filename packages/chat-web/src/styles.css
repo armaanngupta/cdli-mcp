@@ -29,12 +29,29 @@ body {
 .topbar {
   padding: 0.75rem 1.25rem;
   border-bottom: 2px solid var(--cdli-blue);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .topbar h1 {
   font-size: 1.1rem;
   margin: 0;
   color: var(--cdli-blue);
+}
+
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Height-constrained so the mark sits on the same baseline as the word beside it. */
+.wordmark-logo {
+  height: 1.6rem;
+  width: auto;
+  display: block;
 }
 
 .body {
@@ -371,4 +388,433 @@ body {
 .composer button:disabled {
   background: var(--muted);
   cursor: default;
+}
+
+/* ---- Phase H: starters, message actions, artifact cards, ATF ---- */
+
+.starters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.starter {
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--cdli-blue);
+  padding: 0.45rem 0.7rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.starter:hover {
+  border-color: var(--cdli-blue);
+  background: var(--panel);
+}
+
+/* Kept low-contrast so the controls don't compete with the answer itself; they come
+   forward on hover of the surrounding turn. */
+.message-actions {
+  display: flex;
+  gap: 0.35rem;
+  margin: -0.35rem 0 0.75rem;
+  opacity: 0.35;
+  transition: opacity 0.15s;
+}
+
+.message-actions:hover {
+  opacity: 1;
+}
+
+.actions-user {
+  justify-content: flex-end;
+}
+
+.copy-button {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.72rem;
+  padding: 0.15rem 0.45rem;
+  cursor: pointer;
+}
+
+.copy-button:hover {
+  border-color: var(--cdli-blue);
+  color: var(--cdli-blue);
+}
+
+.edit-box textarea {
+  width: 100%;
+  font: inherit;
+  padding: 0.5rem;
+  border: 1px solid var(--cdli-blue);
+}
+
+.edit-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0.35rem 0 0.75rem;
+}
+
+/* Sits in the composer's send slot while a turn runs, so it replaces Send rather than
+   appearing elsewhere. Needs the .composer prefix to outrank `.composer button`. */
+.composer .stop-button {
+  font: inherit;
+  padding: 0 1.25rem;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.composer .stop-button:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.retry-button {
+  align-self: flex-start;
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.8rem;
+  padding: 0.3rem 0.6rem;
+  margin: 0.5rem 0;
+  cursor: pointer;
+}
+
+.retry-button:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.code-block {
+  display: block;
+  position: relative;
+}
+
+/* Only surfaced on hover so it never overlaps the first line of code at rest. */
+.code-block-tools {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.code-block:hover .code-block-tools {
+  opacity: 1;
+}
+
+.artifact-cards {
+  margin: 0.25rem 0 1rem;
+}
+
+.artifact-cards-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+}
+
+.artifact-card-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.artifact-card {
+  display: block;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--cdli-blue);
+  padding: 0.45rem 0.6rem;
+  min-width: 11rem;
+  max-width: 18rem;
+  text-decoration: none;
+  color: var(--ink);
+  background: #fff;
+}
+
+.artifact-card:hover {
+  background: var(--panel);
+}
+
+.artifact-card-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  color: var(--cdli-blue);
+}
+
+.artifact-card-designation {
+  font-size: 0.85rem;
+  margin-top: 0.1rem;
+}
+
+.artifact-card-facets {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 0.2rem;
+}
+
+.atf {
+  display: block;
+  white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  line-height: 1.7;
+}
+
+/* Determinatives are classifiers, not read aloud — raised and muted, as in print. */
+.atf-determinative {
+  color: var(--muted);
+  font-size: 0.7em;
+}
+
+.atf-index {
+  font-size: 0.7em;
+}
+
+/* ---- Restart chat ---- */
+
+.restart-button {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+}
+
+.restart-button:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.restart-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 45%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.modal {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--danger);
+  padding: 1.25rem;
+  max-width: 26rem;
+  margin: 1rem;
+}
+
+.modal h2 {
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+.modal p {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.modal .modal-note {
+  font-size: 0.8rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.modal-actions button {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.modal-actions button:hover {
+  background: var(--panel);
+}
+
+/* Scoped, not !important: `.modal-actions button` above would otherwise win. */
+.modal-actions .modal-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.modal-actions .modal-danger:hover {
+  background: var(--danger);
+  opacity: 0.9;
+}
+
+/* ---- UX polish: layout, turn metadata, scrolling, export ---- */
+
+.topbar-left,
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Only meaningful on narrow screens, where the sidebar is off-canvas. */
+.sidebar-toggle {
+  display: none;
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+}
+
+/* Wraps the scroller so an absolutely positioned control anchors to the viewport area
+   rather than to the scrolled content. */
+.thread-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Centres the starter block instead of stranding it at the top of a tall screen. */
+.thread-empty {
+  min-height: 100%;
+  justify-content: center;
+}
+
+.turn {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Actions stay hidden until the turn is hovered or something inside it is focused, so a
+   long thread is not lined with grey buttons. :focus-within keeps them keyboard-reachable. */
+.turn .message-actions {
+  opacity: 0;
+}
+
+.turn:hover .message-actions,
+.turn:focus-within .message-actions {
+  opacity: 1;
+}
+
+.turn-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin: -0.25rem 0 0.5rem;
+}
+
+.turn-meta code {
+  font-size: 0.72rem;
+  color: var(--cdli-blue);
+}
+
+.turn-model {
+  margin-left: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Right-hand gutter, clear of the 860px text column, so it never sits over the reading
+   line. Solid blue rather than a grey outline, which disappeared against the thread. */
+.jump-latest {
+  position: absolute;
+  bottom: 1rem;
+  right: 1.25rem;
+  background: var(--cdli-blue);
+  border: 1px solid var(--cdli-blue);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 25%);
+  color: #fff;
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.4rem 0.85rem;
+  cursor: pointer;
+}
+
+.jump-latest:hover {
+  background: #12508c;
+  border-color: #12508c;
+}
+
+.composer-hint {
+  max-width: 860px;
+  margin: 0.4rem auto 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+/* Mirrors the thread column's flow rather than using display:contents, which has a history
+   of dropping the element from the accessibility tree — exactly what this wrapper exists for. */
+.live-region {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-start;
+  align-self: stretch;
+}
+
+/* ---- Narrow screens: the sidebar becomes an overlay panel ---- */
+@media (max-width: 800px) {
+  .sidebar-toggle {
+    display: block;
+  }
+
+  .sidebar {
+    position: absolute;
+    z-index: 5;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    transform: translateX(-100%);
+    transition: transform 0.15s ease-out;
+    box-shadow: 0 0 12px rgb(0 0 0 / 15%);
+  }
+
+  .body {
+    position: relative;
+  }
+
+  .body.sidebar-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .message {
+    max-width: 100%;
+  }
+
+  .topbar-actions .restart-button {
+    font-size: 0.72rem;
+    padding: 0.2rem 0.4rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition: none;
+  }
 }
