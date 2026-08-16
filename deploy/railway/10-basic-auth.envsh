@@ -1,0 +1,25 @@
+#!/bin/sh
+# Runs before nginx starts. Must be .envsh, not .sh: the nginx image *sources* .envsh files
+# and *executes* .sh ones, and an exported variable from a subshell would never reach the
+# envsubst step that renders the config.
+#
+# A public URL wired to LLM providers is abusable, so the demo sits behind HTTP Basic Auth.
+# The credential is supplied as a ready-made htpasswd line in BASIC_AUTH, so no hash is
+# baked into the image; leave it unset and the site is open, which is fine locally.
+set -eu
+
+: "${PORT:=8080}"
+: "${DNS_RESOLVER:=8.8.8.8}"
+
+if [ -n "${BASIC_AUTH:-}" ]; then
+  printf '%s\n' "$BASIC_AUTH" > /etc/nginx/.htpasswd
+  # envsubst needs a value even when auth is off, hence a quoted realm rather than empty.
+  AUTH_BASIC='"CDLI demo"'
+  echo "basic auth: enabled"
+else
+  : > /etc/nginx/.htpasswd
+  AUTH_BASIC="off"
+  echo "basic auth: disabled (BASIC_AUTH not set)"
+fi
+
+export PORT DNS_RESOLVER AUTH_BASIC

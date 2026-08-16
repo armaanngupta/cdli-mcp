@@ -18,5 +18,8 @@ RUN uv sync --frozen --no-dev --no-editable
 ENV PATH="/app/.venv/bin:$PATH"
 
 # The packaged `agent-paper` script is the CLI; the HTTP service is a separate entrypoint.
+# HOST/PORT are overridable because some hosts assign the port, and Railway's older
+# environments route private traffic over IPv6 only, where 0.0.0.0 is unreachable.
+# `exec` keeps uvicorn as PID 1 so it still receives SIGTERM.
 EXPOSE 8100
-CMD ["uvicorn", "agent_paper.service:app", "--host", "0.0.0.0", "--port", "8100"]
+CMD ["sh", "-c", "exec uvicorn agent_paper.service:app --host \"${HOST:-0.0.0.0}\" --port \"${PORT:-8100}\""]
