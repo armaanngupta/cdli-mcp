@@ -33,10 +33,28 @@ export class ChatError extends Error {
   }
 }
 
+// Provider SDKs reject with plain objects as readily as with Errors — Groq's tool-call
+// failures arrive as `{ message, type }`. String() renders those as "[object Object]",
+// which is what the user ends up reading in the details expander.
+function describe(err: unknown): string {
+  if (err instanceof Error) return String(err);
+  if (typeof err === 'string') return err;
+  if (typeof err === 'object' && err !== null) {
+    const { message } = err as { message?: unknown };
+    if (typeof message === 'string' && message !== '') return message;
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return String(err);
+    }
+  }
+  return String(err);
+}
+
 export function errorBody(err: unknown): ChatErrorBody {
   return err instanceof ChatError
     ? err.toBody()
-    : { code: ErrorCode.UPSTREAM_ERROR, message: String(err), retryable: false };
+    : { code: ErrorCode.UPSTREAM_ERROR, message: describe(err), retryable: false };
 }
 
 export function sendError(res: Response, err: unknown): void {

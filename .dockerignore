@@ -9,3 +9,6 @@ CLAUDE.md
 .env
 **/.env
 packages/server/test
+**/__pycache__
+.venv
+**/.venv

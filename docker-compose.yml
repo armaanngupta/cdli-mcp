@@ -1,0 +1,75 @@
+# Local development stack for people working on this repo alone.
+#
+# NOT the production deployment. In production this repo is a submodule of cdli/framework,
+# whose own dev/docker-compose.yml and dev/conf/nginx.conf are authoritative — see
+# deploy/framework.md for the blocks that go there.
+#
+#   docker compose up --build      then open http://localhost:8080/chat/
+#
+# Bring your own LLM key through the SPA. Copy packages/chat-backend/.env.example to
+# packages/chat-backend/.env if you need the funded-tier or identity variables; the file
+# is optional and its MCP_URL/PAPER_URL are overridden below with container addresses.
+
+services:
+  mcp:
+    build:
+      context: .
+      dockerfile: packages/server/Dockerfile
+    environment:
+      # The MCP SDK's rebinding check reads the Host header and ignores the port, so these
+      # are bare hostnames. Wrong values surface as a 403 that looks like a network fault.
+      ALLOWED_HOSTS: app_cdli_mcp,localhost,127.0.0.1
+    networks:
+      default:
+        # Production hostnames, so deploy/local-nginx.conf matches deploy/framework.md.
+        aliases: [app_cdli_mcp]
+
+  chat-backend:
+    build:
+      context: .
+      dockerfile: packages/chat-backend/Dockerfile
+    env_file:
+      - path: packages/chat-backend/.env
+        required: false
+    environment:
+      PORT: 8090
+      MCP_URL: http://app_cdli_mcp:3000/mcp
+      PAPER_URL: http://app_cdli_paper:8100
+    depends_on: [mcp]
+    networks:
+      default:
+        aliases: [app_cdli_chat]
+
+  agent-paper:
+    build:
+      context: .
+      dockerfile: agent-paper/Dockerfile
+    environment:
+      MCP_URL: http://app_cdli_mcp:3000/mcp
+    depends_on: [mcp]
+    networks:
+      default:
+        aliases: [app_cdli_paper]
+
+  chat-web:
+    build:
+      context: .
+      dockerfile: packages/chat-web/Dockerfile
+      args:
+        VITE_BASE: /chat/
+    networks:
+      default:
+        aliases: [app_cdli_chat_web]
+
+  nginx:
+    image: nginx:1.29.3-alpine
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./deploy/local-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on: [chat-backend, chat-web, mcp]
+    networks:
+      default:
+
+networks:
+  default:
