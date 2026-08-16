@@ -7,6 +7,7 @@ import type { Identity } from '../auth/verify.js';
 import { trimToBudget } from '../context/window.js';
 import { resolveCredentials } from '../llm/credentials.js';
 import { PROVIDERS } from '../llm/provider.js';
+import { COMMANDS, systemPrompt } from '../prompt/system.js';
 import { applyRateLimit } from '../ratelimit/limiter.js';
 import { ChatError, ErrorCode, errorBody, sendError } from '../util/errors.js';
 import { openSse, sendEvent } from '../util/sse.js';
@@ -24,6 +25,9 @@ const bodySchema = z.object({
   provider: z.enum(PROVIDERS),
   byomKey: z.string().min(1).optional(),
   model: z.string().min(1).optional(),
+  // Slash command the SPA recognised, if any. Unknown commands are rejected here rather
+  // than silently ignored, so a typo doesn't quietly behave like an ordinary question.
+  command: z.enum(COMMANDS).optional(),
 });
 
 export type ChatMessage = z.infer<typeof bodySchema>['messages'][number];
@@ -57,7 +61,7 @@ messageRouter.post('/chat/api/message', (req: Request, res: Response) => {
 async function handleTurn(
   req: Request,
   res: Response,
-  { messages, provider, byomKey, model }: ParsedBody,
+  { messages, provider, byomKey, model, command }: ParsedBody,
   identity: Identity | null,
 ): Promise<void> {
   let credentials;
@@ -89,6 +93,7 @@ async function handleTurn(
           onArtifacts: (cards) => sendEvent(res, 'artifacts', { cards }),
         },
         abort.signal,
+        systemPrompt(command),
       ),
     );
     if (!abort.signal.aborted) {

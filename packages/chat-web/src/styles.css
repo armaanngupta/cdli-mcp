@@ -375,7 +375,9 @@ body {
   resize: none;
 }
 
-.composer button {
+/* Scoped to the input row, not the whole footer: the slash-command menu also lives in
+   .composer, and a bare `.composer button` outranks its own class rules. */
+.composer-col button {
   font: inherit;
   padding: 0 1.25rem;
   border: none;
@@ -385,7 +387,7 @@ body {
   cursor: pointer;
 }
 
-.composer button:disabled {
+.composer-col button:disabled {
   background: var(--muted);
   cursor: default;
 }
@@ -416,10 +418,11 @@ body {
 
 /* Kept low-contrast so the controls don't compete with the answer itself; they come
    forward on hover of the surrounding turn. */
+/* No negative top margin: it pulled the row up over the message bubble it belongs to. */
 .message-actions {
   display: flex;
-  gap: 0.35rem;
-  margin: -0.35rem 0 0.75rem;
+  gap: 0.15rem;
+  margin: 0.25rem 0 0.5rem;
   opacity: 0.35;
   transition: opacity 0.15s;
 }
@@ -432,6 +435,32 @@ body {
   justify-content: flex-end;
 }
 
+/* Icon-only, borderless until hovered — the label lives in title/aria-label. */
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  padding: 0;
+  background: none;
+  border: 1px solid transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  border-color: var(--line);
+  background: #fff;
+  color: var(--cdli-blue);
+}
+
+.icon-button:focus-visible {
+  outline: 2px solid var(--cdli-blue);
+  outline-offset: 1px;
+}
+
+/* Still used by the code-block copy control, which sits on a white card. */
 .copy-button {
   background: none;
   border: 1px solid var(--line);
@@ -460,7 +489,7 @@ body {
 }
 
 /* Sits in the composer's send slot while a turn runs, so it replaces Send rather than
-   appearing elsewhere. Needs the .composer prefix to outrank `.composer button`. */
+   appearing elsewhere. Keeps the .composer prefix to outrank `.composer-col button`. */
 .composer .stop-button {
   font: inherit;
   padding: 0 1.25rem;
@@ -816,5 +845,70 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .sidebar {
     transition: none;
+  }
+}
+
+.empty-commands {
+  font-size: 0.8rem;
+  margin-top: 0.4rem;
+}
+
+.empty-commands code {
+  color: var(--cdli-blue);
+}
+
+/* ---- Slash-command completion menu ---- */
+
+.command-menu {
+  max-width: 860px;
+  margin: 0 auto 0.5rem;
+  border: 1px solid var(--line);
+  background: #fff;
+  box-shadow: 0 -2px 8px rgb(0 0 0 / 8%);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.command-option {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+}
+
+.command-option-active {
+  background: var(--panel);
+}
+
+.command-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--cdli-blue);
+  font-weight: 600;
+}
+
+.command-arg {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* Pushed right so the command names stay in a readable column. */
+.command-hint {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+@media (max-width: 800px) {
+  .command-hint {
+    display: none;
   }
 }

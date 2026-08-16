@@ -30,6 +30,8 @@ export async function runAgentTurn(
   messages: ModelMessage[],
   events: TurnEvents,
   abortSignal: AbortSignal,
+  // Resolved by the route, so the loop stays unaware of slash commands.
+  system: string = SYSTEM_PROMPT,
 ): Promise<AgentResult> {
   const client = await connectMcp();
   try {
@@ -64,7 +66,7 @@ export async function runAgentTurn(
 
     const stream = streamText({
       model,
-      system: SYSTEM_PROMPT,
+      system,
       messages,
       tools,
       stopWhen: stepCountIs(MAX_STEPS),
