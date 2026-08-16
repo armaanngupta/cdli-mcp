@@ -75,19 +75,24 @@ def _is_transient(err: BaseException) -> bool:
 
 
 async def _with_retries(
-    call: Callable[[], Awaitable[Any]],
+    call: Callable[[int], Awaitable[Any]],
     what: str,
     retry_on: Callable[[BaseException], bool],
 ) -> Any:
     """Run a model call, retrying while `retry_on` holds. A paper fires dozens of calls in
     quick succession, so the transient failures that a single-call pipeline shrugged off
-    show up on nearly every run."""
+    show up on nearly every run.
+
+    `call` receives the attempt number so it can vary its input: models run at temperature 0,
+    so re-sending an identical prompt reproduces an identical reply. Retrying a malformed
+    response without changing anything is guaranteed to fail the same way.
+    """
     for attempt, delay in enumerate(RETRY_DELAYS):
         if delay:
             await asyncio.sleep(delay)
         last = attempt == len(RETRY_DELAYS) - 1
         try:
-            result = await call()
+            result = await call(attempt)
         except Exception as err:
             if last or not retry_on(err):
                 raise
@@ -96,6 +101,16 @@ async def _with_retries(
             return result
 
     raise ValueError(f"Model returned no usable {what} after {len(RETRY_DELAYS)} attempts")
+
+
+# Appended from the second attempt on. The common failure is a model annotating its JSON —
+# a comment, or prose beside the values — which is why the repair note names that specifically
+# rather than just repeating "return JSON".
+REPAIR_NOTE = """
+
+Your previous reply could not be parsed as JSON. Return the JSON object only: no code
+fences, no commentary, no comments inside the object, and no text before or after it.
+Every value must be a valid JSON literal."""
 
 
 def _extract_json(text: str) -> str:
@@ -128,8 +143,8 @@ async def ask(config: RunnableConfig, schema: type[Schema], prompt: str) -> Sche
         f"{json.dumps(schema.model_json_schema())}"
     )
 
-    async def call() -> Schema:
-        message = await model.ainvoke(instructed)
+    async def call(attempt: int) -> Schema:
+        message = await model.ainvoke(instructed if attempt == 0 else instructed + REPAIR_NOTE)
         return schema.model_validate_json(_extract_json(_content_str(message)))
 
     return await _with_retries(call, schema.__name__, _is_transient)
@@ -138,7 +153,7 @@ async def ask(config: RunnableConfig, schema: type[Schema], prompt: str) -> Sche
 async def ask_text(config: RunnableConfig, prompt: str) -> str:
     """A call whose result is prose — a summary or a section of the draft."""
     model = model_from(config)
-    message = await _with_retries(lambda: model.ainvoke(prompt), "text", _is_rate_limited)
+    message = await _with_retries(lambda _attempt: model.ainvoke(prompt), "text", _is_rate_limited)
     return _content_str(message)
 
 

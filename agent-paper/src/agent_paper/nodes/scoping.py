@@ -1,8 +1,12 @@
+import logging
+
 from langchain_core.runnables import RunnableConfig
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from agent_paper.llm import ask, render_cards
 from agent_paper.state import PaperState
+
+log = logging.getLogger(__name__)
 
 TOP_N = 10
 
@@ -44,20 +48,30 @@ async def scope(state: PaperState, config: RunnableConfig) -> dict:
     artifacts and the re-scope would achieve nothing.
     """
     cards = state["cards"]
-    ranking = await ask(
-        config,
-        Ranking,
-        PROMPT.format(
-            top_n=TOP_N,
-            topic=state["topic"],
-            listing=render_cards(list(cards.values())),
-            retry_note=RETRY_NOTE if state["rescope_count"] else "",
-        ),
-    )
+    try:
+        ranking = await ask(
+            config,
+            Ranking,
+            PROMPT.format(
+                top_n=TOP_N,
+                topic=state["topic"],
+                listing=render_cards(list(cards.values())),
+                retry_note=RETRY_NOTE if state["rescope_count"] else "",
+            ),
+        )
+        proposed = ranking.artifact_ids
+    except (ValidationError, ValueError) as err:
+        # A ranking is a preference, not a requirement — _fallback_order below is a sound
+        # substitute. Losing a run that has already completed discovery because the model
+        # wrote prose inside its JSON array is a far worse outcome than a heuristic order.
+        # Narrow on purpose: auth and rate-limit failures are not the model's judgement and
+        # must still surface.
+        log.warning("scoping: unusable ranking, falling back to heuristic order (%s)", err)
+        proposed = []
 
     # The model can return ids that aren't in the candidate pool; keep only real ones and
     # top up from the heuristic order so a bad response can't starve the pipeline.
-    chosen = [artifact_id for artifact_id in ranking.artifact_ids if artifact_id in cards]
+    chosen = [artifact_id for artifact_id in proposed if artifact_id in cards]
     for artifact_id in _fallback_order(cards):
         if len(chosen) >= TOP_N:
             break
