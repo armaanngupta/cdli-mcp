@@ -102,6 +102,21 @@ def _titlecase(topic: str) -> str:
     )
 
 
+def _unwrap_emphasis(title: str) -> str:
+    """Drop emphasis markers only when they wrap the *whole* title.
+
+    A blanket strip of "*_" breaks a title that emphasises just one word — `*cdli*
+    Administrative Texts` loses its opening marker and renders the closing one literally.
+    The inner check keeps a title with several emphasised spans intact too.
+    """
+    for marker in ("**", "__", "*", "_"):
+        if len(title) > 2 * len(marker) and title.startswith(marker) and title.endswith(marker):
+            inner = title[len(marker) : -len(marker)]
+            if marker not in inner:
+                return inner.strip()
+    return title
+
+
 def _ensure_title(intro: str, topic: str) -> str:
     """Guarantee the intro opens with a clean H1 title.
 
@@ -112,8 +127,7 @@ def _ensure_title(intro: str, topic: str) -> str:
     stripped = intro.lstrip()
     if stripped.startswith("# "):
         head, _, rest = stripped.partition("\n")
-        title = head[2:].strip().strip("*_").strip()
-        return f"# {title}\n{rest}"
+        return f"# {_unwrap_emphasis(head[2:].strip())}\n{rest}"
     return f"# {_titlecase(topic)}\n\n{intro}"
 
 
