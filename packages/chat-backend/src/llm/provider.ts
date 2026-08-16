@@ -5,19 +5,33 @@ import { createMistral } from '@ai-sdk/mistral';
 import { createOpenAI } from '@ai-sdk/openai';
 import type { LanguageModel } from 'ai';
 
-export const PROVIDERS = ['openai', 'anthropic', 'google', 'mistral', 'groq', 'openrouter'] as const;
+export const PROVIDERS = [
+  'openai',
+  'anthropic',
+  'google',
+  'mistral',
+  'groq',
+  'openrouter',
+] as const;
 export type Provider = (typeof PROVIDERS)[number];
 
 // OpenRouter is OpenAI-API-compatible: the same client, a different base URL. One key reaches
 // every vendor, so model ids are vendor-namespaced (e.g. "anthropic/claude-3.5-sonnet").
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
-// Cheap tool-capable default per provider; overridable per request.
+// Cheap tool-capable default per provider; overridable per request. Verified against each
+// provider's published model list on 2026-08-16 — a default that 404s makes a provider look
+// broken rather than misconfigured.
 const DEFAULT_MODEL: Record<Provider, string> = {
-  openai: 'gpt-5-mini',
+  // gpt-5-mini is deprecated with an API shutdown on 2026-12-10; luna is the current
+  // budget tier and the like-for-like replacement.
+  openai: 'gpt-5.6-luna',
   anthropic: 'claude-haiku-4-5',
   google: 'gemini-2.5-flash',
   mistral: 'mistral-small-latest',
+  // Known-bad at tool calling on every Groq model tried so far (llama-3.3-70b and
+  // gpt-oss-120b both emit malformed calls) — kept as the default only because no Groq
+  // model behaves better.
   groq: 'llama-3.3-70b-versatile',
   openrouter: 'openai/gpt-4o-mini',
 };
