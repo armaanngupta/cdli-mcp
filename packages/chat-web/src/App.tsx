@@ -6,6 +6,7 @@ import { displayName, fetchToken } from './api/identity';
 import cdliLogo from './assets/cdli-logo.png';
 import { downloadPaperPdf, streamPaper } from './api/paper';
 import { ArtifactCards } from './components/ArtifactCard';
+import { EditIcon, RegenerateIcon } from './components/icons';
 import { CopyButton, MessageView } from './components/MessageView';
 import {
   clearEncryptedKey,
@@ -98,6 +99,48 @@ const MODEL_OPTIONS: Record<string, ModelOption[]> = {
 
 const PAPER_COMMAND = '/paper';
 
+// Slash commands that bias an ordinary chat turn rather than routing elsewhere. /paper is
+// separate: it runs a different service entirely.
+const SLASH_COMMANDS = {
+  '/search': 'search',
+  '/artifact': 'artifact',
+  '/cqp': 'cqp',
+} as const;
+
+type SlashCommand = (typeof SLASH_COMMANDS)[keyof typeof SLASH_COMMANDS];
+
+// Everything the composer will complete, /paper included — it is a slash command to the
+// user even though it runs a different service.
+const COMMAND_MENU = [
+  { name: '/search', argument: '<criteria>', hint: 'Search the catalogue' },
+  { name: '/artifact', argument: '<P-number>', hint: 'Look up one artifact' },
+  { name: '/cqp', argument: '<query>', hint: 'Run a CQP corpus query' },
+  { name: '/paper', argument: '<topic>', hint: 'Write a research note (takes minutes)' },
+];
+
+/**
+ * Commands to offer for the current draft. Only while the command word itself is being
+ * typed — once there is a space the user has moved on to the argument.
+ */
+function commandMatches(draft: string) {
+  if (!/^\/\S*$/.test(draft)) return [];
+  const typed = draft.toLowerCase();
+  return COMMAND_MENU.filter((c) => c.name.startsWith(typed));
+}
+
+const COMMAND_HINT: Record<SlashCommand, string> = {
+  search: 'Give /search some criteria — e.g. “/search Ur III tablets from Umma”.',
+  artifact: 'Give /artifact an identifier — e.g. “/artifact P100141”.',
+  cqp: 'Give /cqp a query — e.g. “/cqp w1:[ ( conll:FORM = "lugal" ) ]”.',
+};
+
+/** Split a leading slash command off the draft. Unknown slashes are left as ordinary text. */
+function parseCommand(text: string): { command?: SlashCommand; rest: string } {
+  const match = /^(\/[a-z]+)(\s+|$)/i.exec(text);
+  const command = match && SLASH_COMMANDS[match[1].toLowerCase() as keyof typeof SLASH_COMMANDS];
+  return command ? { command, rest: text.slice(match![1].length).trim() } : { rest: text };
+}
+
 // What the backend pins the funded tier to (chat-backend/src/llm/credentials.ts). Shown on
 // funded answers, where the provider and model pickers are ignored.
 const FUNDED_MODEL = 'mistral-small-latest';
@@ -113,6 +156,9 @@ type Message = ChatMessage & {
   // The tools this turn used. Retained after the turn so a finished answer still shows
   // that it was grounded in the corpus rather than answered from memory.
   tools?: string[];
+  // Set on a user turn that used a slash command. Stored rather than re-parsed so
+  // regenerate and retry reproduce the same biased turn.
+  command?: SlashCommand;
 };
 
 // Domain examples for a fresh thread: one per capability, so the empty state doubles as a
@@ -248,7 +294,10 @@ export function App() {
   const [atBottom, setAtBottom] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [copiedAll, setCopiedAll] = useState(false);
+  // Highlighted row in the slash-command menu.
+  const [menuIndex, setMenuIndex] = useState(0);
   const threadRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   // Bumped on restart. A turn aborted mid-flight still runs its tail, which would otherwise
@@ -260,6 +309,9 @@ export function App() {
   // funded key when no BYOM key is sent.
   const usingFunded = !unlockedKey && identityToken !== null;
   const accountName = displayName(identityToken);
+  const menu = commandMatches(draft);
+  // Clamped rather than reset, so narrowing the list cannot leave the highlight off the end.
+  const highlighted = Math.min(menuIndex, Math.max(menu.length - 1, 0));
   // Why the composer cannot send right now, if anything. /paper has the stricter
   // requirement, so which check applies depends on what is typed.
   const blocker = draft.trim().startsWith(PAPER_COMMAND)
@@ -410,6 +462,36 @@ export function App() {
     abortRef.current?.abort();
   }
 
+  /** Complete the draft to a command and leave the caret ready for its argument. */
+  function pickCommand(name: string) {
+    setDraft(`${name} `);
+    setMenuIndex(0);
+    composerRef.current?.focus();
+  }
+
+  /** Returns true when the menu consumed the key, so the composer should not also act. */
+  function menuKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): boolean {
+    if (menu.length === 0) return false;
+    switch (e.key) {
+      case 'ArrowDown':
+        setMenuIndex((i) => (Math.min(i, menu.length - 1) + 1) % menu.length);
+        return true;
+      case 'ArrowUp':
+        setMenuIndex((i) => (Math.min(i, menu.length - 1) + menu.length - 1) % menu.length);
+        return true;
+      case 'Tab':
+      case 'Enter':
+        pickCommand(menu[highlighted].name);
+        return true;
+      case 'Escape':
+        // Dismiss by making the draft no longer a bare command word.
+        setDraft(`${draft} `);
+        return true;
+      default:
+        return false;
+    }
+  }
+
   // A small tolerance, so "at the bottom" survives sub-pixel rounding and the growth of the
   // last line while tokens arrive.
   function onThreadScroll() {
@@ -498,6 +580,9 @@ export function App() {
           // funded path server-side.
           byomKey: unlockedKey || undefined,
           model: model.trim() || undefined,
+          // Read off the turn being answered, so regenerate and retry stay biased the
+          // same way the original request was.
+          command: history[history.length - 1]?.command,
         },
         {
           onToken: (text) => {
@@ -573,7 +658,13 @@ export function App() {
       return;
     }
 
-    await runTurn([...messages, { role: 'user', content }]);
+    const { command, rest } = parseCommand(content);
+    if (command && !rest) {
+      setError(COMMAND_HINT[command]);
+      return;
+    }
+
+    await runTurn([...messages, { role: 'user', content, command }]);
   }
 
   /** Re-answer the last user turn, discarding the assistant reply that followed it. */
@@ -599,7 +690,14 @@ export function App() {
       setError(problem);
       return;
     }
-    await runTurn([...messages.slice(0, index), { role: 'user', content }]);
+    // Re-parsed rather than inherited: the edit may have added or removed the command.
+    const { command, rest } = parseCommand(content);
+    if (command && !rest) {
+      setError(COMMAND_HINT[command]);
+      return;
+    }
+
+    await runTurn([...messages.slice(0, index), { role: 'user', content, command }]);
   }
 
   async function retry() {
@@ -828,6 +926,10 @@ export function App() {
                       Ask about the cuneiform corpus, or write a research note with{' '}
                       <code>/paper</code> — a paper run takes a few minutes.
                     </p>
+                    <p className="empty-commands">
+                      <code>/search</code> catalogue criteria · <code>/artifact</code> a P-number ·{' '}
+                      <code>/cqp</code> a corpus query
+                    </p>
                     <div className="starters">
                       {STARTERS.map((s) => (
                         <button key={s} className="starter" onClick={() => void send(s)}>
@@ -860,18 +962,25 @@ export function App() {
                         <CopyButton text={m.content} />
                         {m.role === 'user' && !busy && (
                           <button
-                            className="copy-button"
+                            className="icon-button"
+                            title="Edit and resend"
+                            aria-label="Edit and resend"
                             onClick={() => {
                               setEditing(i);
                               setEditDraft(m.content);
                             }}
                           >
-                            Edit
+                            <EditIcon />
                           </button>
                         )}
                         {m.role === 'assistant' && !busy && i === messages.length - 1 && (
-                          <button className="copy-button" onClick={() => void regenerate()}>
-                            Regenerate
+                          <button
+                            className="icon-button"
+                            title="Regenerate"
+                            aria-label="Regenerate this answer"
+                            onClick={() => void regenerate()}
+                          >
+                            <RegenerateIcon />
                           </button>
                         )}
                       </div>
@@ -960,14 +1069,42 @@ export function App() {
           </div>
 
           <footer className="composer">
+            {menu.length > 0 && (
+              <div className="command-menu" role="listbox" aria-label="Slash commands">
+                {menu.map((c, i) => (
+                  <button
+                    key={c.name}
+                    className={`command-option${i === highlighted ? ' command-option-active' : ''}`}
+                    role="option"
+                    aria-selected={i === highlighted}
+                    // onMouseDown, not onClick: click fires after the textarea has already
+                    // blurred, which closes the menu before the handler runs.
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      pickCommand(c.name);
+                    }}
+                    onMouseEnter={() => setMenuIndex(i)}
+                  >
+                    <span className="command-name">{c.name}</span>
+                    <span className="command-arg">{c.argument}</span>
+                    <span className="command-hint">{c.hint}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="composer-col">
               <textarea
+                ref={composerRef}
                 value={draft}
-                placeholder="Ask a question, or /paper <topic>…   (Shift+Enter for a new line)"
+                placeholder="Ask a question, or type / for commands…   (Shift+Enter for a new line)"
                 rows={2}
                 aria-label="Message"
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {
+                  if (menuKeyDown(e)) {
+                    e.preventDefault();
+                    return;
+                  }
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     void send();

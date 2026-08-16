@@ -14,6 +14,8 @@ export interface ChatRequest {
   // Omitted on the CDLI-funded path, where the backend supplies the key from an identity.
   byomKey?: string;
   model?: string;
+  /** Slash command for this turn; biases the backend's system prompt towards one tool. */
+  command?: 'search' | 'artifact' | 'cqp';
 }
 
 export interface AuthContext {

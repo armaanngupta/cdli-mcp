@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { ChatMessage } from '../api/chat';
 import { AtfBlock, looksLikeAtf } from './atf';
+import { CheckIcon, CopyIcon } from './icons';
 
 export function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
@@ -19,8 +20,15 @@ export function CopyButton({ text, label = 'Copy' }: { text: string; label?: str
   }
 
   return (
-    <button className="copy-button" onClick={() => void copy()} title={label} type="button">
-      {copied ? '✓ Copied' : label}
+    <button
+      className="icon-button"
+      onClick={() => void copy()}
+      // Icon-only, so the label has to live in the accessible name and the tooltip.
+      title={copied ? 'Copied' : label}
+      aria-label={copied ? 'Copied' : label}
+      type="button"
+    >
+      {copied ? <CheckIcon /> : <CopyIcon />}
     </button>
   );
 }
