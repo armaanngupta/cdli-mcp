@@ -11,6 +11,10 @@ export default defineConfig({
     // proxy mirrors that so the SPA never needs CORS or an absolute backend URL.
     proxy: {
       '/chat/api': 'http://localhost:8090',
+      // The identity token is minted by CakePHP, and the session cookie only rides along
+      // same-origin — so dev has to borrow the framework's nginx (dev/docker-compose.dev.yml
+      // publishes it on 2354) rather than talk to a second origin.
+      '/chat/token': 'http://localhost:2354',
     },
   },
 });

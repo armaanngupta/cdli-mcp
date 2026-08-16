@@ -13,6 +13,12 @@ export function classifyError(raw: string): FriendlyError {
   let message: string;
   if (has('no artifacts found')) {
     message = 'No CDLI artifacts matched that topic. Try a broader or differently worded topic.';
+    // Both of these are the backend's own wording (chat-backend/src/llm/credentials.ts) and
+    // match none of the generic 401/429 needles below, so they need their own branches.
+  } else if (has('free tier exhausted', 'budget_exhausted')) {
+    message = "CDLI's free tier is used up for today. Add your own API key to keep going.";
+  } else if (has('sign in or provide')) {
+    message = 'Sign in to cdli.earth to use the free tier, or add your own API key.';
   } else if (
     has('401', 'unauthorized', 'invalid api key', 'incorrect api key', 'invalid_api_key')
   ) {
