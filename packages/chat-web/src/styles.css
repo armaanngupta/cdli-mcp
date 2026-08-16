@@ -666,3 +666,155 @@ body {
   background: var(--danger);
   opacity: 0.9;
 }
+
+/* ---- UX polish: layout, turn metadata, scrolling, export ---- */
+
+.topbar-left,
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Only meaningful on narrow screens, where the sidebar is off-canvas. */
+.sidebar-toggle {
+  display: none;
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+}
+
+/* Wraps the scroller so an absolutely positioned control anchors to the viewport area
+   rather than to the scrolled content. */
+.thread-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Centres the starter block instead of stranding it at the top of a tall screen. */
+.thread-empty {
+  min-height: 100%;
+  justify-content: center;
+}
+
+.turn {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Actions stay hidden until the turn is hovered or something inside it is focused, so a
+   long thread is not lined with grey buttons. :focus-within keeps them keyboard-reachable. */
+.turn .message-actions {
+  opacity: 0;
+}
+
+.turn:hover .message-actions,
+.turn:focus-within .message-actions {
+  opacity: 1;
+}
+
+.turn-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin: -0.25rem 0 0.5rem;
+}
+
+.turn-meta code {
+  font-size: 0.72rem;
+  color: var(--cdli-blue);
+}
+
+.turn-model {
+  margin-left: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Right-hand gutter, clear of the 860px text column, so it never sits over the reading
+   line. Solid blue rather than a grey outline, which disappeared against the thread. */
+.jump-latest {
+  position: absolute;
+  bottom: 1rem;
+  right: 1.25rem;
+  background: var(--cdli-blue);
+  border: 1px solid var(--cdli-blue);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 25%);
+  color: #fff;
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.4rem 0.85rem;
+  cursor: pointer;
+}
+
+.jump-latest:hover {
+  background: #12508c;
+  border-color: #12508c;
+}
+
+.composer-hint {
+  max-width: 860px;
+  margin: 0.4rem auto 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+/* Mirrors the thread column's flow rather than using display:contents, which has a history
+   of dropping the element from the accessibility tree — exactly what this wrapper exists for. */
+.live-region {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-start;
+  align-self: stretch;
+}
+
+/* ---- Narrow screens: the sidebar becomes an overlay panel ---- */
+@media (max-width: 800px) {
+  .sidebar-toggle {
+    display: block;
+  }
+
+  .sidebar {
+    position: absolute;
+    z-index: 5;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    transform: translateX(-100%);
+    transition: transform 0.15s ease-out;
+    box-shadow: 0 0 12px rgb(0 0 0 / 15%);
+  }
+
+  .body {
+    position: relative;
+  }
+
+  .body.sidebar-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .message {
+    max-width: 100%;
+  }
+
+  .topbar-actions .restart-button {
+    font-size: 0.72rem;
+    padding: 0.2rem 0.4rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition: none;
+  }
+}

@@ -95,9 +95,22 @@ const MODEL_OPTIONS: Record<string, ModelOption[]> = {
 
 const PAPER_COMMAND = '/paper';
 
+// What the backend pins the funded tier to (chat-backend/src/llm/credentials.ts). Shown on
+// funded answers, where the provider and model pickers are ignored.
+const FUNDED_MODEL = 'mistral-small-latest';
+
 // A paper result is an assistant message that is also downloadable as a PDF; the title drives
 // the filename. Extra fields over ChatMessage — stripped before the history is sent.
-type Message = ChatMessage & { paperTitle?: string; cards?: ArtifactCard[] };
+type Message = ChatMessage & {
+  paperTitle?: string;
+  cards?: ArtifactCard[];
+  // Kept per message rather than read from current state: the model can be switched
+  // mid-thread, and a finished answer should say what actually produced it.
+  model?: string;
+  // The tools this turn used. Retained after the turn so a finished answer still shows
+  // that it was grounded in the corpus rather than answered from memory.
+  tools?: string[];
+};
 
 // Domain examples for a fresh thread: one per capability, so the empty state doubles as a
 // hint that this searches a real catalogue rather than answering from the model's memory.
@@ -227,6 +240,12 @@ export function App() {
   const [editing, setEditing] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [confirmRestart, setConfirmRestart] = useState(false);
+  // Auto-scroll only while the user is already at the bottom; otherwise reading back
+  // through a thread is yanked away on every token.
+  const [atBottom, setAtBottom] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [copiedAll, setCopiedAll] = useState(false);
+  const threadRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   // Bumped on restart. A turn aborted mid-flight still runs its tail, which would otherwise
@@ -238,6 +257,13 @@ export function App() {
   // funded key when no BYOM key is sent.
   const usingFunded = !unlockedKey && identityToken !== null;
   const accountName = displayName(identityToken);
+  // Why the composer cannot send right now, if anything. /paper has the stricter
+  // requirement, so which check applies depends on what is typed.
+  const blocker = draft.trim().startsWith(PAPER_COMMAND)
+    ? unlockedKey
+      ? null
+      : 'A paper run needs your own API key — it makes 15–30 model calls.'
+    : credentialProblem();
 
   useEffect(() => {
     setStoredKey(loadEncryptedKey());
@@ -251,8 +277,8 @@ export function App() {
   }
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamedText, toolCalls, paperSteps, activity]);
+    if (atBottom) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, streamedText, toolCalls, paperSteps, activity, atBottom]);
 
   useEffect(() => {
     if (!confirmRestart) return;
@@ -381,6 +407,45 @@ export function App() {
     abortRef.current?.abort();
   }
 
+  // A small tolerance, so "at the bottom" survives sub-pixel rounding and the growth of the
+  // last line while tokens arrive.
+  function onThreadScroll() {
+    const el = threadRef.current;
+    if (!el) return;
+    setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
+  }
+
+  function jumpToLatest() {
+    setAtBottom(true);
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  /** The conversation as Markdown — nothing is persisted, so this is the only way to keep it. */
+  function transcript(): string {
+    return messages
+      .map((m) => `## ${m.role === 'user' ? 'You' : 'CDLI Chat'}\n\n${m.content}`)
+      .join('\n\n');
+  }
+
+  async function copyTranscript() {
+    try {
+      await navigator.clipboard.writeText(transcript());
+      setCopiedAll(true);
+      setTimeout(() => setCopiedAll(false), 1500);
+    } catch {
+      // Clipboard is unavailable outside a secure context; the download still works.
+    }
+  }
+
+  function downloadTranscript() {
+    const url = URL.createObjectURL(new Blob([transcript()], { type: 'text/markdown' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cdli-chat-${new Date().toISOString().slice(0, 10)}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function restartChat() {
     turnIdRef.current += 1;
     abortRef.current?.abort();
@@ -420,6 +485,7 @@ export function App() {
 
     let acc = '';
     let cards: ArtifactCard[] = [];
+    const used: string[] = [];
     try {
       await streamChat(
         {
@@ -439,6 +505,7 @@ export function App() {
           },
           onTool: (name, status) => {
             setToolCalls((prev) => upsertTool(prev, name, status));
+            if (status === 'started' && !used.includes(name)) used.push(name);
             // The tool row carries its own animation while it runs; between a finished tool
             // and the next token, fall back to a generic "Thinking".
             setActivity(status === 'started' ? null : 'Thinking');
@@ -463,7 +530,17 @@ export function App() {
     abortRef.current = null;
 
     // Partial text is kept on a stop: it is what the user chose to keep.
-    if (acc) setMessages((prev) => [...prev, { role: 'assistant', content: acc, cards }]);
+    if (acc)
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: acc,
+          cards,
+          tools: used,
+          model: usingFunded ? FUNDED_MODEL : model.trim() || `${provider} default`,
+        },
+      ]);
     setStreamedText(null);
     setActivity(null);
     setToolCalls([]);
@@ -530,18 +607,46 @@ export function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <h1 className="wordmark">
-          <img src={cdliLogo} alt="CDLI" className="wordmark-logo" />
-          <span>Chat</span>
-        </h1>
-        <button
-          className="restart-button"
-          onClick={() => setConfirmRestart(true)}
-          disabled={messages.length === 0 && !busy}
-          title="Clear this conversation and start over"
-        >
-          ↻ Restart chat
-        </button>
+        <div className="topbar-left">
+          <button
+            className="sidebar-toggle"
+            onClick={() => setSidebarOpen((open) => !open)}
+            aria-label={sidebarOpen ? 'Hide settings' : 'Show settings'}
+            aria-expanded={sidebarOpen}
+          >
+            ☰
+          </button>
+          <h1 className="wordmark">
+            <img src={cdliLogo} alt="CDLI" className="wordmark-logo" />
+            <span>Chat</span>
+          </h1>
+        </div>
+        <div className="topbar-actions">
+          <button
+            className="restart-button"
+            onClick={() => void copyTranscript()}
+            disabled={messages.length === 0}
+            aria-label="Copy the whole conversation as Markdown"
+          >
+            {copiedAll ? '✓ Copied' : 'Copy all'}
+          </button>
+          <button
+            className="restart-button"
+            onClick={downloadTranscript}
+            disabled={messages.length === 0}
+            aria-label="Download the conversation as a Markdown file"
+          >
+            ⬇ Export
+          </button>
+          <button
+            className="restart-button"
+            onClick={() => setConfirmRestart(true)}
+            disabled={messages.length === 0 && !busy}
+            aria-label="Clear this conversation and start over"
+          >
+            ↻ Restart chat
+          </button>
+        </div>
       </header>
 
       {confirmRestart && (
@@ -575,7 +680,7 @@ export function App() {
         </div>
       )}
 
-      <div className="body">
+      <div className={`body${sidebarOpen ? ' sidebar-open' : ''}`}>
         <aside className="sidebar">
           <div className="user">
             {/* Name comes from the token's `name` claim (see api/identity.ts). Anonymous
@@ -709,125 +814,155 @@ export function App() {
         </aside>
 
         <main className="chat">
-          <div className="thread">
-            <div className="thread-col">
-              {messages.length === 0 && streamedText === null && (
-                <div className="empty">
-                  <p>
-                    Ask about the cuneiform corpus, or write a research note with{' '}
-                    <code>/paper</code> — a paper run takes a few minutes.
-                  </p>
-                  <div className="starters">
-                    {STARTERS.map((s) => (
-                      <button key={s} className="starter" onClick={() => void send(s)}>
-                        {s}
-                      </button>
-                    ))}
+          {/* A non-scrolling anchor for the jump control: positioned inside .thread it would
+              be laid out against the scrolled content and drift up with it. */}
+          <div className="thread-wrap">
+            <div className="thread" ref={threadRef} onScroll={onThreadScroll}>
+              <div className={`thread-col${messages.length === 0 ? ' thread-empty' : ''}`}>
+                {messages.length === 0 && streamedText === null && (
+                  <div className="empty">
+                    <p>
+                      Ask about the cuneiform corpus, or write a research note with{' '}
+                      <code>/paper</code> — a paper run takes a few minutes.
+                    </p>
+                    <div className="starters">
+                      {STARTERS.map((s) => (
+                        <button key={s} className="starter" onClick={() => void send(s)}>
+                          {s}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-              {messages.map((m, i) => (
-                <Fragment key={i}>
-                  {editing === i ? (
-                    <div className="edit-box">
-                      <textarea
-                        value={editDraft}
-                        onChange={(e) => setEditDraft(e.target.value)}
-                        rows={3}
-                        autoFocus
-                      />
-                      <div className="edit-actions">
-                        <button onClick={() => void resendEdited(i)}>Resend</button>
-                        <button onClick={() => setEditing(null)}>Cancel</button>
+                )}
+                {messages.map((m, i) => (
+                  <div className="turn" key={i}>
+                    {editing === i ? (
+                      <div className="edit-box">
+                        <textarea
+                          value={editDraft}
+                          onChange={(e) => setEditDraft(e.target.value)}
+                          rows={3}
+                          autoFocus
+                        />
+                        <div className="edit-actions">
+                          <button onClick={() => void resendEdited(i)}>Resend</button>
+                          <button onClick={() => setEditing(null)}>Cancel</button>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <MessageView message={m} />
-                  )}
-                  {editing !== i && (
-                    <div className={`message-actions actions-${m.role}`}>
-                      <CopyButton text={m.content} />
-                      {m.role === 'user' && !busy && (
-                        <button
-                          className="copy-button"
-                          onClick={() => {
-                            setEditing(i);
-                            setEditDraft(m.content);
-                          }}
-                        >
-                          Edit
-                        </button>
-                      )}
-                      {m.role === 'assistant' && !busy && i === messages.length - 1 && (
-                        <button className="copy-button" onClick={() => void regenerate()}>
-                          Regenerate
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  {m.cards && m.cards.length > 0 && <ArtifactCards cards={m.cards} />}
-                  {m.paperTitle && (
-                    <button className="download-pdf" onClick={() => void downloadPdf(m)}>
-                      ⬇ Download PDF
-                    </button>
-                  )}
-                </Fragment>
-              ))}
-              {streamedText !== null && (
-                <>
-                  {paperSteps.map((step, i) => (
-                    <div key={`step-${i}`} className="tool tool-finished">
-                      ✓ {step}
-                    </div>
-                  ))}
-                  {toolCalls.map((t, i) => (
-                    <div key={i} className={`tool tool-${t.status}`}>
-                      {t.status === 'started' ? '⚙ calling' : t.status === 'finished' ? '✓' : '✕'}{' '}
-                      <code>{t.name}</code>
-                      {t.status === 'started' && <Dots />}
-                    </div>
-                  ))}
-                  {activity && (
-                    <div className="tool activity">
-                      {activity}
-                      <Dots />
-                    </div>
-                  )}
-                  {streamedText !== '' && (
-                    <MessageView message={{ role: 'assistant', content: streamedText }} />
-                  )}
-                  {turnCards.length > 0 && <ArtifactCards cards={turnCards} />}
-                </>
-              )}
-              {warning && <div className="warning">{warning}</div>}
-              {error &&
-                (() => {
-                  const e = classifyError(error);
-                  return (
-                    <div className="error">
-                      <div>{e.message}</div>
-                      {lastHistory && !busy && (
-                        <button className="retry-button" onClick={() => void retry()}>
-                          ↻ Retry
-                        </button>
-                      )}
-                      <details className="error-detail">
-                        <summary>Details</summary>
-                        <pre>{e.detail}</pre>
-                      </details>
-                    </div>
-                  );
-                })()}
-              <div ref={bottomRef} />
+                    ) : (
+                      <MessageView message={m} />
+                    )}
+                    {editing !== i && (
+                      <div className={`message-actions actions-${m.role}`}>
+                        <CopyButton text={m.content} />
+                        {m.role === 'user' && !busy && (
+                          <button
+                            className="copy-button"
+                            onClick={() => {
+                              setEditing(i);
+                              setEditDraft(m.content);
+                            }}
+                          >
+                            Edit
+                          </button>
+                        )}
+                        {m.role === 'assistant' && !busy && i === messages.length - 1 && (
+                          <button className="copy-button" onClick={() => void regenerate()}>
+                            Regenerate
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {m.cards && m.cards.length > 0 && <ArtifactCards cards={m.cards} />}
+                    {m.role === 'assistant' && (m.model || m.tools?.length) && (
+                      <div className="turn-meta">
+                        {m.tools?.length ? (
+                          <span>
+                            Used{' '}
+                            {m.tools.map((t, j) => (
+                              <Fragment key={t}>
+                                {j > 0 && ', '}
+                                <code>{t}</code>
+                              </Fragment>
+                            ))}
+                          </span>
+                        ) : (
+                          <span>No corpus tools used</span>
+                        )}
+                        {m.model && <span className="turn-model">{m.model}</span>}
+                      </div>
+                    )}
+                    {m.paperTitle && (
+                      <button className="download-pdf" onClick={() => void downloadPdf(m)}>
+                        ⬇ Download PDF
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {streamedText !== null && (
+                  // Announced to screen readers, which otherwise get nothing at all while a
+                  // turn streams. "polite" so it does not interrupt on every token.
+                  <div className="live-region" aria-live="polite" aria-busy="true">
+                    {paperSteps.map((step, i) => (
+                      <div key={`step-${i}`} className="tool tool-finished">
+                        ✓ {step}
+                      </div>
+                    ))}
+                    {toolCalls.map((t, i) => (
+                      <div key={i} className={`tool tool-${t.status}`}>
+                        {t.status === 'started' ? '⚙ calling' : t.status === 'finished' ? '✓' : '✕'}{' '}
+                        <code>{t.name}</code>
+                        {t.status === 'started' && <Dots />}
+                      </div>
+                    ))}
+                    {activity && (
+                      <div className="tool activity">
+                        {activity}
+                        <Dots />
+                      </div>
+                    )}
+                    {streamedText !== '' && (
+                      <MessageView message={{ role: 'assistant', content: streamedText }} />
+                    )}
+                    {turnCards.length > 0 && <ArtifactCards cards={turnCards} />}
+                  </div>
+                )}
+                {warning && <div className="warning">{warning}</div>}
+                {error &&
+                  (() => {
+                    const e = classifyError(error);
+                    return (
+                      <div className="error">
+                        <div>{e.message}</div>
+                        {lastHistory && !busy && (
+                          <button className="retry-button" onClick={() => void retry()}>
+                            ↻ Retry
+                          </button>
+                        )}
+                        <details className="error-detail">
+                          <summary>Details</summary>
+                          <pre>{e.detail}</pre>
+                        </details>
+                      </div>
+                    );
+                  })()}
+                <div ref={bottomRef} />
+              </div>
             </div>
+            {!atBottom && messages.length > 0 && (
+              <button className="jump-latest" onClick={jumpToLatest} aria-label="Jump to latest">
+                ↓ Latest
+              </button>
+            )}
           </div>
 
           <footer className="composer">
             <div className="composer-col">
               <textarea
                 value={draft}
-                placeholder="Ask a question, or /paper <topic>…"
+                placeholder="Ask a question, or /paper <topic>…   (Shift+Enter for a new line)"
                 rows={2}
+                aria-label="Message"
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -837,15 +972,22 @@ export function App() {
                 }}
               />
               {busy ? (
-                <button className="stop-button" onClick={stop} title="Stop generating">
+                <button className="stop-button" onClick={stop} aria-label="Stop generating">
                   ■ Stop
                 </button>
               ) : (
-                <button onClick={() => void send()} disabled={!draft.trim()}>
+                <button
+                  onClick={() => void send()}
+                  // The credential check used to happen only on submit, so the reason for a
+                  // refusal appeared after the attempt rather than before it.
+                  disabled={!draft.trim() || blocker !== null}
+                  title={blocker ?? undefined}
+                >
                   Send
                 </button>
               )}
             </div>
+            {blocker && <p className="composer-hint">{blocker}</p>}
           </footer>
         </main>
       </div>
