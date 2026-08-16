@@ -1,13 +1,30 @@
+import base64
 import io
+import logging
 from pathlib import Path
 
 import markdown as md
 from xhtml2pdf import pisa
 
+log = logging.getLogger(__name__)
+
 # --- Swappable placeholders -------------------------------------------------------------
 # Drop the real CDLI logo here (PNG/JPG) and it is used automatically; until then the header
 # renders a text placeholder.
-LOGO_PATH = Path(__file__).parent / "assets" / "cdli-logo.png"
+ASSETS = Path(__file__).parent / "assets"
+LOGO_PATH = ASSETS / "cdli-logo.png"
+
+# The PDF base-14 fonts cover WinAnsi only, which has no subscript digits and none of the
+# Assyriological diacritics — every ku3, GAN2, s,/t,/h. rendered as a missing-glyph box.
+# ReportLab's own bundled Vera is no better (283 glyphs). DejaVu Serif carries all of them,
+# so it ships with the package rather than depending on host fonts.
+FONT_DIR = ASSETS / "fonts"
+FONT_FAMILY = "DejaVuSerif"
+_FONT_FILES = {
+    "": "DejaVuSerif.ttf",
+    "-Bold": "DejaVuSerif-Bold.ttf",
+    "-Italic": "DejaVuSerif-Italic.ttf",
+}
 
 # PLACEHOLDER wording. Replace with CDLI's approved disclosure before this ships. It appears
 # in the footer of every page, not just the first, so an excerpted page still carries it.
@@ -24,12 +41,13 @@ _TEMPLATE = """<!DOCTYPE html>
 <html>
 <head>
 <style>
+  {font_face}
   @page {{
     size: a4;
     margin: 2.2cm 2cm 2.6cm 2cm;
     @frame footer {{ -pdf-frame-content: footerContent; bottom: 1.1cm; height: 1.4cm; }}
   }}
-  body {{ font-family: Helvetica, sans-serif; font-size: 10.5pt; line-height: 1.5; color: #212529; }}
+  body {{ font-family: {font}; font-size: 10.5pt; line-height: 1.5; color: #212529; }}
   .masthead {{ border-bottom: 2pt solid #1661ab; padding-bottom: 6pt; margin-bottom: 16pt; }}
   .brand {{ color: #1661ab; font-size: 13pt; font-weight: bold; }}
   .brand-sub {{ color: #495057; font-size: 8pt; }}
@@ -51,9 +69,49 @@ _TEMPLATE = """<!DOCTYPE html>
 </html>"""
 
 
+def _link_callback(uri: str, rel: str) -> str:
+    """Resolve @font-face urls to real paths.
+
+    xhtml2pdf will not read a local file without this — registering the face with
+    reportlab alone is not enough, because the CSS font-family is resolved through
+    xhtml2pdf's own font list, which is populated from @font-face via this callback.
+    """
+    return uri
+
+
+def _font_css() -> tuple[str, str]:
+    """Return (@font-face rules, font-family) for the bundled family.
+
+    Falls back to Helvetica when the files are absent, so a packaging slip yields an ugly
+    PDF rather than no PDF — missing-glyph boxes are the signal that this happened.
+    """
+    missing = [name for name in _FONT_FILES.values() if not (FONT_DIR / name).exists()]
+    if missing:
+        log.warning("PDF fonts missing %s, falling back to Helvetica", missing)
+        return "", "Helvetica"
+
+    rules = "\n".join(
+        f"@font-face {{ font-family: {FONT_FAMILY}; "
+        f"src: url({(FONT_DIR / filename).as_posix()}); {style} }}"
+        for style, filename in (
+            ("", _FONT_FILES[""]),
+            ("font-weight: bold;", _FONT_FILES["-Bold"]),
+            ("font-style: italic;", _FONT_FILES["-Italic"]),
+        )
+    )
+    return rules, FONT_FAMILY
+
+
 def _masthead() -> str:
+    """The logo, inlined.
+
+    xhtml2pdf resolves <img src> through a link_callback it does not have here, so a
+    file:// path is dropped *silently* — result.err stays 0 and the masthead just comes out
+    empty. A data URI carries the bytes in the document and cannot fail to resolve.
+    """
     if LOGO_PATH.exists():
-        return f'<img src="{LOGO_PATH.as_uri()}" height="42" />'
+        encoded = base64.b64encode(LOGO_PATH.read_bytes()).decode("ascii")
+        return f'<img src="data:image/png;base64,{encoded}" height="42" />'
     return (
         '<div class="brand">CDLI</div>'
         '<div class="brand-sub">Cuneiform Digital Library Initiative &mdash; '
@@ -68,10 +126,17 @@ def render_pdf(markdown_text: str) -> bytes:
     download re-renders that text rather than regenerating the (paid, minutes-long) paper.
     """
     body = md.markdown(markdown_text, extensions=["tables", "sane_lists"])
-    html = _TEMPLATE.format(logo=_masthead(), body=body, disclosure=AI_DISCLOSURE)
+    font_face, font = _font_css()
+    html = _TEMPLATE.format(
+        logo=_masthead(),
+        body=body,
+        disclosure=AI_DISCLOSURE,
+        font_face=font_face,
+        font=font,
+    )
 
     out = io.BytesIO()
-    result = pisa.CreatePDF(html, dest=out, encoding="utf-8")
+    result = pisa.CreatePDF(html, dest=out, encoding="utf-8", link_callback=_link_callback)
     if result.err:
         raise RuntimeError("PDF rendering failed")
     return out.getvalue()
