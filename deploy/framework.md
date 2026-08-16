@@ -5,14 +5,18 @@ pattern as `app/tools/cqp4rdf`. Nothing here is applied automatically — it is 
 reference for the framework-side merge request, which touches four files:
 
 1. `.gitmodules`
-2. `dev/docker-compose.yml` (and `.dev.yml` / `.gea.yml` / `.alliance.yml`)
+2. `dev/docker-compose.dev.yml` (and `.gea.yml` / `.alliance.yml` for those envs)
 3. `dev/conf/nginx.conf`
-4. `dev/config.json`
+4. `dev/config.dev.json`
 
-`dev/cdli.py` reads `config.json` and strips services whose `enabled` is false, keying
-off the `# Image--<group>:<name>` marker comments — so every service below needs both a
-marker and a `config.json` entry, or it will be silently dropped from the generated
-compose file.
+**Do not edit `dev/docker-compose.yml` or `dev/config.json` — both are gitignored.**
+`docker-compose.yml` is *generated* by `dev/cdli.py` from `docker-compose.<env>.yml` on
+every run, so edits there are silently overwritten. `config.json` is a developer's local
+copy of the tracked `config.dev.json` template.
+
+`cdli.py` reads `config.json` and strips services whose `enabled` is false, keying off the
+`# Image--<group>:<name>` marker comments — so every service below needs both a marker and
+a config entry, or it will be silently dropped from the generated compose file.
 
 ---
 
@@ -108,6 +112,16 @@ already present in the `http` block (line 56). Without it nginx starts cleanly a
 502s on every request.
 
 ```nginx
+    # MUST come with (not after) the /chat/ block below. CakePHP mints the identity token
+    # at /chat/token, but `^~ /chat/` would swallow that path and hand it to the SPA's
+    # static file server, which answers 405 and never reaches PHP. An exact `=` match has
+    # the highest precedence in nginx and wins over `^~`, so this restores the route.
+    # try_files falls through to the existing @cake FastCGI block rather than duplicating
+    # its fastcgi_param/fastcgi_pass setup.
+    location = /chat/token {
+      try_files $uri @cake;
+    }
+
     # The chat SPA. VITE_BASE bakes /chat/ into asset URLs, so the browser requests
     # /chat/assets/... and the rewrite strips the prefix before the container's nginx.
     location ^~ /chat/ {
@@ -166,7 +180,7 @@ multi-word joins today.
 
 ---
 
-## 4. `dev/config.json`
+## 4. `dev/config.dev.json` (and your local `dev/config.json`)
 
 Under `"app"`, beside the existing `cake` and `cqp4rdf` entries:
 

@@ -2,6 +2,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { streamChat } from './api/chat';
 import type { ChatMessage, ToolStatus } from './api/chat';
 import { classifyError } from './api/errors';
+import { fetchToken } from './api/identity';
 import { downloadPaperPdf, streamPaper } from './api/paper';
 import { MessageView } from './components/MessageView';
 import {
@@ -127,6 +128,9 @@ export function App() {
   const [customModel, setCustomModel] = useState(false);
   const [storedKey, setStoredKey] = useState<StoredKey | null>(null);
   const [unlockedKey, setUnlockedKey] = useState('');
+  // Null means anonymous — either not signed in on cdli.earth, or the endpoint isn't
+  // reachable (it doesn't exist outside the framework stack). Never blocks the BYOM path.
+  const [identityToken, setIdentityToken] = useState<string | null>(null);
   const [newKeyInput, setNewKeyInput] = useState('');
   const [pin, setPin] = useState('');
   const [keyError, setKeyError] = useState<string | null>(null);
@@ -142,10 +146,20 @@ export function App() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const busy = streamedText !== null;
+  // A user's own key always wins — the backend's resolveCredentials only reaches for the
+  // funded key when no BYOM key is sent.
+  const usingFunded = !unlockedKey && identityToken !== null;
 
   useEffect(() => {
     setStoredKey(loadEncryptedKey());
+    void fetchToken().then(setIdentityToken);
   }, []);
+
+  async function refreshIdentity(): Promise<string | null> {
+    const fresh = await fetchToken();
+    setIdentityToken(fresh);
+    return fresh;
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -187,6 +201,15 @@ export function App() {
   async function runPaper(userLine: string, topic: string) {
     if (!topic) {
       setError('Give /paper a topic — e.g. “/paper temple offerings at Girsu”.');
+      return;
+    }
+    // Deliberately not covered by the funded tier: one run is 15-30 model calls against a
+    // chat turn's 1-2, so /paper stays BYOM-only until per-run cost is agreed.
+    if (!unlockedKey) {
+      setError(
+        'A paper run needs your own API key — it makes 15–30 model calls, so it is not ' +
+          "covered by CDLI's free tier.",
+      );
       return;
     }
 
@@ -252,13 +275,19 @@ export function App() {
   async function send() {
     const content = draft.trim();
     if (!content || busy) return;
-    if (!unlockedKey) {
-      setError('Unlock your API key first.');
+
+    // Checked before the key guard: /paper has its own, stricter requirement.
+    if (content.startsWith(PAPER_COMMAND)) {
+      await runPaper(content, content.slice(PAPER_COMMAND.length).trim());
       return;
     }
 
-    if (content.startsWith(PAPER_COMMAND)) {
-      await runPaper(content, content.slice(PAPER_COMMAND.length).trim());
+    if (!unlockedKey && !identityToken) {
+      setError(
+        storedKey
+          ? 'Unlock your API key, or sign in to cdli.earth to use the free tier.'
+          : 'Sign in to cdli.earth to use the free tier, or add your own API key.',
+      );
       return;
     }
 
@@ -277,7 +306,9 @@ export function App() {
         {
           messages: history.slice(-MAX_SENT_MESSAGES),
           provider,
-          byomKey: unlockedKey,
+          // Sent only when the user has their own key; its absence is what selects the
+          // funded path server-side.
+          byomKey: unlockedKey || undefined,
           model: model.trim() || undefined,
         },
         {
@@ -296,6 +327,8 @@ export function App() {
           onDone: () => {},
           onError: (message) => setError(message),
         },
+        undefined,
+        { token: identityToken, refresh: refreshIdentity },
       );
     } catch (err) {
       setError(String(err));
@@ -316,12 +349,21 @@ export function App() {
       <div className="body">
         <aside className="sidebar">
           <div className="user">
-            {/* Placeholder — replaced by the cdli.earth account name once the
-                identity bridge (Phase E) lands. */}
+            {/* The token carries only a user id, not a display name, so the label states the
+                credential in use — which is the part that affects the next message. */}
             <div className="avatar">C</div>
             <div>
-              <div className="user-name">CDLI User</div>
-              <div className="user-hint">not signed in</div>
+              <div className="user-name">{identityToken ? 'Signed in' : 'CDLI User'}</div>
+              <div className="user-hint">
+                {usingFunded && "using CDLI's free tier"}
+                {identityToken && unlockedKey && 'using your own key'}
+                {!identityToken && unlockedKey && 'not signed in · using your own key'}
+                {!identityToken && !unlockedKey && (
+                  <>
+                    not signed in — <a href="/login">sign in</a> for the free tier
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -335,7 +377,9 @@ export function App() {
                 setModel('');
                 setCustomModel(false);
               }}
-              disabled={busy}
+              // resolveCredentials ignores provider and model on the funded path, so a live
+              // picker would silently lie about which model answers.
+              disabled={busy || usingFunded}
             >
               {PROVIDERS.map((p) => (
                 <option key={p} value={p}>
@@ -343,6 +387,12 @@ export function App() {
                 </option>
               ))}
             </select>
+            {usingFunded && (
+              <p className="key-hint">
+                On CDLI&rsquo;s free tier the model is fixed to <code>mistral-small-latest</code>.
+                Add your own key to choose a provider and model.
+              </p>
+            )}
             <label htmlFor="model">Model</label>
             <select
               id="model"
@@ -356,7 +406,7 @@ export function App() {
                   setModel(e.target.value);
                 }
               }}
-              disabled={busy}
+              disabled={busy || usingFunded}
             >
               <option value="">Provider default</option>
               {MODEL_OPTIONS[provider]?.map((m) => (
@@ -373,7 +423,7 @@ export function App() {
                 placeholder="exact model id"
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                disabled={busy}
+                disabled={busy || usingFunded}
               />
             )}
             {!storedKey && !unlockedKey && (
