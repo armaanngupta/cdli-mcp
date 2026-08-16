@@ -25,9 +25,20 @@ export interface AuthContext {
   refresh: () => Promise<string | null>;
 }
 
+export interface ArtifactCard {
+  p_number: string;
+  url: string;
+  designation?: string;
+  period?: string;
+  provenience?: string;
+  genre?: string;
+  language?: string;
+}
+
 export interface StreamHandlers {
   onToken: (text: string) => void;
   onTool: (name: string, status: ToolStatus) => void;
+  onArtifacts: (cards: ArtifactCard[]) => void;
   onDone: (toolCallCount: number) => void;
   onError: (message: string) => void;
 }
@@ -36,6 +47,7 @@ interface EventPayload {
   text?: string;
   name?: string;
   status?: ToolStatus;
+  cards?: ArtifactCard[];
   toolCallCount?: number;
   message?: string;
 }
@@ -82,6 +94,9 @@ function dispatch(frame: SseFrame, handlers: StreamHandlers): void {
       break;
     case 'tool':
       handlers.onTool(payload.name ?? 'tool', payload.status ?? 'started');
+      break;
+    case 'artifacts':
+      handlers.onArtifacts(payload.cards ?? []);
       break;
     case 'done':
       handlers.onDone(payload.toolCallCount ?? 0);

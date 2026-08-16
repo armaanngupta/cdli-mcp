@@ -86,6 +86,7 @@ async function handleTurn(
         {
           onToken: (text) => sendEvent(res, 'token', { text }),
           onTool: (name, status) => sendEvent(res, 'tool', { name, status }),
+          onArtifacts: (cards) => sendEvent(res, 'artifacts', { cards }),
         },
         abort.signal,
       ),

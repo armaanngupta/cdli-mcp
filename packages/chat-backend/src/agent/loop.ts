@@ -1,5 +1,7 @@
 import { dynamicTool, jsonSchema, stepCountIs, streamText } from 'ai';
 import type { JSONSchema7, LanguageModel, ModelMessage, ToolSet } from 'ai';
+import { extractCards } from './artifacts.js';
+import type { ArtifactCard } from './artifacts.js';
 import { callTool, connectMcp, listTools } from './mcpClient.js';
 import { SYSTEM_PROMPT } from '../prompt/system.js';
 import { ChatError, ErrorCode } from '../util/errors.js';
@@ -15,6 +17,8 @@ export type ToolStatus = 'started' | 'finished' | 'error';
 export interface TurnEvents {
   onToken: (text: string) => void;
   onTool: (name: string, status: ToolStatus) => void;
+  /** Artifact cards seen in a tool's output, for the SPA's citation cards. */
+  onArtifacts: (cards: ArtifactCard[]) => void;
 }
 
 export interface AgentResult {
@@ -49,7 +53,10 @@ export async function runAgentTurn(
               input as Record<string, unknown>,
               options.abortSignal,
             );
-            return outcome.isError ? `TOOL ERROR: ${outcome.text}` : outcome.text;
+            if (outcome.isError) return `TOOL ERROR: ${outcome.text}`;
+            const cards = extractCards(outcome.text);
+            if (cards.length) events.onArtifacts(cards);
+            return outcome.text;
           },
         }),
       ]),

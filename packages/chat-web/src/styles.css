@@ -29,12 +29,29 @@ body {
 .topbar {
   padding: 0.75rem 1.25rem;
   border-bottom: 2px solid var(--cdli-blue);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .topbar h1 {
   font-size: 1.1rem;
   margin: 0;
   color: var(--cdli-blue);
+}
+
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Height-constrained so the mark sits on the same baseline as the word beside it. */
+.wordmark-logo {
+  height: 1.6rem;
+  width: auto;
+  display: block;
 }
 
 .body {
@@ -371,4 +388,281 @@ body {
 .composer button:disabled {
   background: var(--muted);
   cursor: default;
+}
+
+/* ---- Phase H: starters, message actions, artifact cards, ATF ---- */
+
+.starters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.starter {
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--cdli-blue);
+  padding: 0.45rem 0.7rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.starter:hover {
+  border-color: var(--cdli-blue);
+  background: var(--panel);
+}
+
+/* Kept low-contrast so the controls don't compete with the answer itself; they come
+   forward on hover of the surrounding turn. */
+.message-actions {
+  display: flex;
+  gap: 0.35rem;
+  margin: -0.35rem 0 0.75rem;
+  opacity: 0.35;
+  transition: opacity 0.15s;
+}
+
+.message-actions:hover {
+  opacity: 1;
+}
+
+.actions-user {
+  justify-content: flex-end;
+}
+
+.copy-button {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.72rem;
+  padding: 0.15rem 0.45rem;
+  cursor: pointer;
+}
+
+.copy-button:hover {
+  border-color: var(--cdli-blue);
+  color: var(--cdli-blue);
+}
+
+.edit-box textarea {
+  width: 100%;
+  font: inherit;
+  padding: 0.5rem;
+  border: 1px solid var(--cdli-blue);
+}
+
+.edit-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0.35rem 0 0.75rem;
+}
+
+/* Sits in the composer's send slot while a turn runs, so it replaces Send rather than
+   appearing elsewhere. Needs the .composer prefix to outrank `.composer button`. */
+.composer .stop-button {
+  font: inherit;
+  padding: 0 1.25rem;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.composer .stop-button:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.retry-button {
+  align-self: flex-start;
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.8rem;
+  padding: 0.3rem 0.6rem;
+  margin: 0.5rem 0;
+  cursor: pointer;
+}
+
+.retry-button:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.code-block {
+  display: block;
+  position: relative;
+}
+
+/* Only surfaced on hover so it never overlaps the first line of code at rest. */
+.code-block-tools {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.code-block:hover .code-block-tools {
+  opacity: 1;
+}
+
+.artifact-cards {
+  margin: 0.25rem 0 1rem;
+}
+
+.artifact-cards-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+}
+
+.artifact-card-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.artifact-card {
+  display: block;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--cdli-blue);
+  padding: 0.45rem 0.6rem;
+  min-width: 11rem;
+  max-width: 18rem;
+  text-decoration: none;
+  color: var(--ink);
+  background: #fff;
+}
+
+.artifact-card:hover {
+  background: var(--panel);
+}
+
+.artifact-card-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  color: var(--cdli-blue);
+}
+
+.artifact-card-designation {
+  font-size: 0.85rem;
+  margin-top: 0.1rem;
+}
+
+.artifact-card-facets {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 0.2rem;
+}
+
+.atf {
+  display: block;
+  white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  line-height: 1.7;
+}
+
+/* Determinatives are classifiers, not read aloud — raised and muted, as in print. */
+.atf-determinative {
+  color: var(--muted);
+  font-size: 0.7em;
+}
+
+.atf-index {
+  font-size: 0.7em;
+}
+
+/* ---- Restart chat ---- */
+
+.restart-button {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+}
+
+.restart-button:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.restart-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 45%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.modal {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--danger);
+  padding: 1.25rem;
+  max-width: 26rem;
+  margin: 1rem;
+}
+
+.modal h2 {
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+.modal p {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.modal .modal-note {
+  font-size: 0.8rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.modal-actions button {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.modal-actions button:hover {
+  background: var(--panel);
+}
+
+/* Scoped, not !important: `.modal-actions button` above would otherwise win. */
+.modal-actions .modal-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.modal-actions .modal-danger:hover {
+  background: var(--danger);
+  opacity: 0.9;
 }
