@@ -35,11 +35,21 @@ describe('inscription MCP App', () => {
     await client.close();
   });
 
-  it('links get_inscription to the view via _meta', async () => {
+  // The view hangs off show_inscription, not get_inscription: binding it to retrieval
+  // rendered a widget on every intermediate call while the model was still working.
+  it('links show_inscription to the view via _meta', async () => {
+    const client = await connect();
+    const { tools } = await client.listTools();
+    const tool = tools.find((t) => t.name === 'show_inscription');
+    expect(tool?._meta?.ui).toMatchObject({ resourceUri: VIEW_URI });
+    await client.close();
+  });
+
+  it('leaves get_inscription with no view', async () => {
     const client = await connect();
     const { tools } = await client.listTools();
     const tool = tools.find((t) => t.name === 'get_inscription');
-    expect(tool?._meta?.ui).toMatchObject({ resourceUri: VIEW_URI });
+    expect(tool?._meta?.ui).toBeUndefined();
     await client.close();
   });
 
@@ -66,11 +76,19 @@ describe('artifact-card MCP App', () => {
     await client.close();
   });
 
-  it('links advanced_search to the view via _meta', async () => {
+  it('links show_artifact_cards to the view via _meta', async () => {
+    const client = await connect();
+    const { tools } = await client.listTools();
+    const tool = tools.find((t) => t.name === 'show_artifact_cards');
+    expect(tool?._meta?.ui).toMatchObject({ resourceUri: CARD_URI });
+    await client.close();
+  });
+
+  it('leaves advanced_search with no view', async () => {
     const client = await connect();
     const { tools } = await client.listTools();
     const tool = tools.find((t) => t.name === 'advanced_search');
-    expect(tool?._meta?.ui).toMatchObject({ resourceUri: CARD_URI });
+    expect(tool?._meta?.ui).toBeUndefined();
     await client.close();
   });
 

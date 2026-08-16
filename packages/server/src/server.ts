@@ -9,6 +9,8 @@ import { registerGetMetadata } from './tools/get_metadata.js';
 import { registerResearchPaperPrompt } from './prompts/research_paper.js';
 import { registerPing } from './tools/ping.js';
 import { registerSearchEntity } from './tools/search_entity.js';
+import { registerShowArtifactCards } from './tools/show_artifact_cards.js';
+import { registerShowInscription } from './tools/show_inscription.js';
 
 export function createServer(): McpServer {
   const server = new McpServer({
@@ -23,6 +25,10 @@ export function createServer(): McpServer {
   registerGetBibliography(server);
   registerSearchEntity(server);
   registerCqpQuery(server);
+  // Display-only tools, separate from retrieval so a widget renders once in the final
+  // answer rather than on every intermediate call.
+  registerShowArtifactCards(server);
+  registerShowInscription(server);
   registerInscriptionApp(server);
   registerArtifactCardApp(server);
   registerResearchPaperPrompt(server);

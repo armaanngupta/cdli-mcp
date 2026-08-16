@@ -18,7 +18,7 @@ function textOf(result: { content: unknown[] }): string {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('server registration', () => {
-  it('registers exactly the 7 exposed tools', async () => {
+  it('registers exactly the 9 exposed tools', async () => {
     const client = await connect();
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
@@ -29,7 +29,25 @@ describe('server registration', () => {
       'get_metadata',
       'ping',
       'search_entity',
+      'show_artifact_cards',
+      'show_inscription',
     ]);
+    await client.close();
+  });
+
+  // The point of the split: retrieval tools carry no UI, so a widget cannot render on
+  // every intermediate call. Only the display tools do.
+  it('binds a UI to the display tools only', async () => {
+    const client = await connect();
+    const { tools } = await client.listTools();
+    const withUi = tools
+      .filter((t) => {
+        const meta = t._meta as { ui?: { resourceUri?: string } } | undefined;
+        return meta?.ui?.resourceUri !== undefined || meta?.['ui/resourceUri'] !== undefined;
+      })
+      .map((t) => t.name)
+      .sort();
+    expect(withUi).toEqual(['show_artifact_cards', 'show_inscription']);
     await client.close();
   });
 
