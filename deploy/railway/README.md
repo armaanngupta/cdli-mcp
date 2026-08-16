@@ -101,12 +101,22 @@ docker run --rm alpine:3 sh -c \
 
 ### Cost
 
-Roughly **$8–9/month** of usage at ~0.8 GB total (memory is billed at
-$0.00000386/GB-second). The Hobby plan's $5 credit covers about half. The Free plan's $1
-credit lasts about three days and caps services at 0.5 GB, which `agent-paper` will exceed.
+Measured on the local compose stack (`docker stats`), not estimated:
+
+| Service | Idle | Peak |
+|---|---|---|
+| `agent-paper` | 157 MiB | 261 MiB during a full `/paper` run |
+| `chat-backend` | 100 MiB | — |
+| `mcp` | 62 MiB | — |
+| `web` | ~21 MiB | — |
+| **total** | **~340 MiB** | ~444 MiB |
+
+Every service is well inside the Free plan's 0.5 GB per-service cap. At $0.00000386 per
+GB-second that is about **$0.13/day**, so ~$1.80 for a two-week review window and ~$3.90 for
+the full 30-day trial — the trial's $5 of credits covers it.
 
 **Delete the project when the review window closes** — it bills per second whether anyone
-visits or not.
+visits or not, and the trial becomes $1/month afterwards.
 
 ---
 
