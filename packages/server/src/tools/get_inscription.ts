@@ -1,7 +1,5 @@
-import { registerAppTool } from '@modelcontextprotocol/ext-apps/server';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { INSCRIPTION_VIEW_URI } from '../apps/inscription.js';
 import { cdliFetch, cdliFetchText, cdliUrl, normalizeArtifactId } from '../cdliAPI/client.js';
 import { CdliArtifact } from '../cdliAPI/types.js';
 import { toErrorResponse } from '../util/errors.js';
@@ -21,7 +19,8 @@ function extractAtf(records: CdliArtifact[]): string | undefined {
   return undefined;
 }
 
-async function fetchAtf(nid: string, displayId: string) {
+/** Exported for show_inscription, which renders the same ATF through the app widget. */
+export async function fetchAtf(nid: string, displayId: string) {
   const records = await cdliFetch<CdliArtifact[]>(cdliUrl(`/artifacts/${nid}.json`));
   const atf = extractAtf(records);
   return atf === undefined
@@ -43,12 +42,11 @@ async function fetchConll(nid: string, displayId: string, format: ConllFormat) {
 }
 
 export function registerGetInscription(server: McpServer): void {
-  registerAppTool(
-    server,
+  server.registerTool(
     'get_inscription',
     {
-      // Hosts without MCP Apps support ignore _meta and render the text content as before.
-      _meta: { ui: { resourceUri: INSCRIPTION_VIEW_URI } },
+      // Deliberately no UI: a widget bound here renders on every call, including the
+      // several a model makes while working out an answer. show_inscription displays.
       description: `Fetch the inscription for a CDLI artifact in a chosen format.
 
 Accepts a P-number (P000001, P12345) or a bare integer (12345).
@@ -59,6 +57,8 @@ Formats:
 - conll-u — Universal Dependencies CoNLL-U annotation.
 
 Most artifacts are not linguistically annotated, so cdli-conll / conll-u are often unavailable; when that happens the tool says so and you should fall back to atf. Artifacts with no inscription at all are reported too.
+
+To show an inscription to the user as a formatted view, call show_inscription once at the end instead of relying on this tool's output.
 
 Avoid more than ~5 consecutive calls in a single turn.`,
       inputSchema: {

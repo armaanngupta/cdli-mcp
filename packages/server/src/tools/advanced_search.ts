@@ -1,7 +1,5 @@
-import { registerAppTool } from '@modelcontextprotocol/ext-apps/server';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { ARTIFACT_CARD_URI } from '../apps/card.js';
 import { cdliFetchWithHeaders, cdliUrl, parseLinkHeader } from '../cdliAPI/client.js';
 import { compressArtifact } from '../cdliAPI/compress.js';
 import { CdliArtifactRecord } from '../cdliAPI/types.js';
@@ -73,12 +71,11 @@ const HAS_FACET = {
 } as const;
 
 export function registerAdvancedSearch(server: McpServer): void {
-  registerAppTool(
-    server,
+  server.registerTool(
     'advanced_search',
     {
-      // Hosts without MCP Apps support ignore _meta and render the text content as before.
-      _meta: { ui: { resourceUri: ARTIFACT_CARD_URI } },
+      // Deliberately no UI: a widget bound here renders on every call, and a model
+      // typically searches several times before answering. show_artifact_cards displays.
       description: `Search CDLI artifacts by metadata fields.
 
 Builds: GET https://cdli.earth/search.json?{fields}&limit&page
@@ -113,6 +110,10 @@ needs them, never by default:
 The response reports the total number of matching artifacts (exact for a single
 page, otherwise an estimate). Page through results with "page"; to read beyond
 ~10,000 results, use the search_after cursor echoed in the response instead.
+
+To show results to the user as a visual card grid, call show_artifact_cards once at the
+end with the artifacts you are presenting, rather than relying on this tool's output.
+
 Avoid more than ~5 consecutive calls in a single turn.`,
       inputSchema: {
         provenience: z.string().optional().describe('Findspot/origin, e.g. "Nippur"'),
