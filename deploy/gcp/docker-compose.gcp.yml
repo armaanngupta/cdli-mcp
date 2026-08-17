@@ -3,7 +3,7 @@
 # one definition of them, not two.
 #
 #   docker compose -f docker-compose.yml -f deploy/gcp/docker-compose.gcp.yml \
-#     --scale nginx=0 up -d --build
+#     up -d --build --scale nginx=0
 #
 # --scale nginx=0 keeps the local-development proxy out of the way: Caddy replaces it here,
 # and compose cannot delete a service an overlay inherits.
@@ -41,9 +41,14 @@ services:
 
   mcp:
     environment:
-      # Bare hostname, no scheme or port: the MCP SDK's rebinding check ignores the port.
-      # Wrong value produces a 403 that looks exactly like a network fault.
-      ALLOWED_HOSTS: '${ALLOWED_HOSTS:?set ALLOWED_HOSTS to your bare hostname}'
+      # The public hostname plus the internal names chat-backend and agent-paper dial. Both
+      # are required: the SDK's rebinding check rejects any Host it was not told about, and
+      # the internal callers use the app_cdli_mcp alias from the base compose. Listing only
+      # the public hostname breaks every internal call with "Invalid Host: app_cdli_mcp",
+      # which surfaces in the SPA as a generic failure.
+      #
+      # Bare hostnames, no scheme or port — the check ignores the port.
+      ALLOWED_HOSTS: '${ALLOWED_HOSTS:?set ALLOWED_HOSTS to your bare hostname},app_cdli_mcp,localhost,127.0.0.1'
     restart: unless-stopped
 
   chat-backend:

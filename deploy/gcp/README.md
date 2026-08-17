@@ -64,13 +64,27 @@ cat > .env <<'EOF'
 SITE_ADDRESS=cdli-demo.duckdns.org
 ALLOWED_HOSTS=cdli-demo.duckdns.org
 BASIC_AUTH_USER=demo
-BASIC_AUTH_HASH=$2a$14$...
+BASIC_AUTH_HASH=$$2a$$14$$rest-of-the-hash-unchanged
 EOF
 ```
+
+> **Double every `$` in the hash.** Compose interpolates `$NAME` in `.env` values, so a raw
+> `$2a$14$i3j1…` arrives at the container as a 37-character stump with the middle silently
+> blanked — and Basic Auth then rejects every login with nothing in the logs to explain it.
+> `$$` is an escaped literal `$`. Only the three separators need it; bcrypt's body uses just
+> `A–Za–z0–9./`. Using `env_file:` instead does **not** avoid this — it interpolates too.
+>
+> Verify after starting: `docker compose exec caddy printenv BASIC_AUTH_HASH` must print
+> **60 characters** beginning `$2a$14$`.
 
 `ALLOWED_HOSTS` must be the **bare hostname** — no scheme, no port. The MCP SDK's
 DNS-rebinding check ignores the port, and a wrong value produces a 403 that looks exactly
 like a networking fault.
+
+Set only the public hostname here: the overlay appends `app_cdli_mcp,localhost,127.0.0.1`
+itself. Those are needed because chat-backend and agent-paper reach the MCP server over the
+internal `app_cdli_mcp` alias, and a value listing only the public hostname fails every
+internal call with `Invalid Host: app_cdli_mcp` — which the SPA reports as a generic error.
 
 The chat backend also reads `packages/chat-backend/.env` if present, for
 `CHAT_IDENTITY_SECRET` and `FUNDED_MISTRAL_API_KEY`. Both are optional here: without the
@@ -80,7 +94,7 @@ CakePHP token route the funded tier is unreachable, so the demo is bring-your-ow
 
 ```bash
 docker compose -f docker-compose.yml -f deploy/gcp/docker-compose.gcp.yml \
-  --scale nginx=0 up -d --build
+  up -d --build --scale nginx=0
 ```
 
 `--scale nginx=0` keeps the local-development proxy out of the way; Caddy replaces it, and
