@@ -35,7 +35,11 @@ export async function runAgentTurn(
 ): Promise<AgentResult> {
   const client = await connectMcp();
   try {
-    const mcpTools = await listTools(client);
+    // The server's show_* tools exist for MCP Apps hosts, which render a ui:// widget per
+    // tool result. This host renders artifact cards natively from the `artifacts` event, so
+    // offering them here would buy nothing and cost plenty: the model calls one at the end,
+    // it re-fetches every artifact individually, and its raw JSON lands in the answer.
+    const mcpTools = (await listTools(client)).filter((t) => !t.name.startsWith('show_'));
     let toolCallCount = 0;
 
     const tools: ToolSet = Object.fromEntries(
