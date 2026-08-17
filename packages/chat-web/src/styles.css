@@ -912,3 +912,19 @@ body {
     display: none;
   }
 }
+
+.artifact-cards-more {
+  margin-top: 0.5rem;
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--cdli-blue);
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+}
+
+.artifact-cards-more:hover {
+  border-color: var(--cdli-blue);
+  background: var(--panel);
+}
