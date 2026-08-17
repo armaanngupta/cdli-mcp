@@ -3,6 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- cdli.earth's own 256x256 icon, not the wordmark: the wordmark is 390x188, and a 2:1
+         image squeezed into a square tab slot is illegible. Referenced from src/ so Vite
+         hashes it and rewrites the path for VITE_BASE — a bare /favicon.ico would 404
+         under the framework's /chat/ prefix. -->
+    <link rel="icon" type="image/x-icon" href="/src/assets/favicon.ico" />
     <title>CDLI Chat</title>
   </head>
   <body>
