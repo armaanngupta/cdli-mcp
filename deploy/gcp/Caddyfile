@@ -1,0 +1,38 @@
+# Front proxy for the GCP demo VM. Caddy rather than nginx+certbot: it obtains and renews
+# Let's Encrypt certificates on its own, which is the only job the framework's nginx does
+# not already do for us.
+#
+# SITE_ADDRESS is the public hostname (e.g. cdli-demo.duckdns.org). Set it to ":80" to run
+# plain HTTP locally — Caddy only attempts certificates for a real hostname.
+
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	# A public URL onto CDLI's API, running a tool whose AI-disclosure wording is not yet
+	# approved. Delete this block to open the site up.
+	basic_auth {
+		{$BASIC_AUTH_USER} {$BASIC_AUTH_HASH}
+	}
+
+	# flush_interval -1 disables response buffering — the Caddy equivalent of nginx's
+	# proxy_buffering off. Without it the SSE stream arrives in one lump at the end and a
+	# /paper run looks frozen for two minutes.
+	handle /chat/api/* {
+		reverse_proxy chat-backend:8090 {
+			flush_interval -1
+		}
+	}
+
+	# Streamable HTTP responses are SSE too.
+	handle /mcp* {
+		reverse_proxy mcp:3000 {
+			flush_interval -1
+		}
+	}
+
+	# The built SPA, served from the domain root by its own nginx. Unlike the framework
+	# deployment there is no /chat/ prefix, so VITE_BASE is overridden to "/".
+	handle {
+		reverse_proxy chat-web:80
+	}
+}

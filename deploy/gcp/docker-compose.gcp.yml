@@ -1,0 +1,57 @@
+# Overlay on the repo-root docker-compose.yml for the GCP demo VM. Adds TLS, a public
+# hostname and Basic Auth; the four application services are inherited unchanged so there is
+# one definition of them, not two.
+#
+#   docker compose -f docker-compose.yml -f deploy/gcp/docker-compose.gcp.yml \
+#     --scale nginx=0 up -d --build
+#
+# --scale nginx=0 keeps the local-development proxy out of the way: Caddy replaces it here,
+# and compose cannot delete a service an overlay inherits.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      # Public hostname; Caddy uses it to request the certificate. ":80" for plain HTTP.
+      # Quoted because an unquoted ${VAR:?message} containing ": " parses as a YAML mapping.
+      SITE_ADDRESS: '${SITE_ADDRESS:?set SITE_ADDRESS to your hostname}'
+      BASIC_AUTH_USER: '${BASIC_AUTH_USER:-demo}'
+      BASIC_AUTH_HASH: '${BASIC_AUTH_HASH:?generate with caddy hash-password, see deploy/gcp/README.md}'
+    volumes:
+      - ./deploy/gcp/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Named volumes, so an issued certificate survives a rebuild. Losing them means
+      # re-requesting certificates and risking Let's Encrypt's rate limit.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - chat-web
+      - chat-backend
+      - mcp
+
+  chat-web:
+    build:
+      args:
+        # Served from the domain root here, not under /chat/ as in the framework.
+        VITE_BASE: /
+    restart: unless-stopped
+
+  mcp:
+    environment:
+      # Bare hostname, no scheme or port: the MCP SDK's rebinding check ignores the port.
+      # Wrong value produces a 403 that looks exactly like a network fault.
+      ALLOWED_HOSTS: '${ALLOWED_HOSTS:?set ALLOWED_HOSTS to your bare hostname}'
+    restart: unless-stopped
+
+  chat-backend:
+    restart: unless-stopped
+
+  agent-paper:
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
