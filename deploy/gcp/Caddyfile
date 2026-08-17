@@ -8,9 +8,12 @@
 {$SITE_ADDRESS} {
 	encode zstd gzip
 
-	# A public URL onto CDLI's API, running a tool whose AI-disclosure wording is not yet
-	# approved. Delete this block to open the site up.
-	basic_auth {
+	# /mcp is specified as fully public with open CORS (architecture rule), so that any MCP
+	# client can connect without credentials. Everything else — the SPA and the chat API —
+	# stays behind Basic Auth: it runs a tool whose AI-disclosure wording is not yet
+	# approved, and an unattended public chat box is worth keeping closed.
+	@needs_auth not path /mcp /mcp/*
+	basic_auth @needs_auth {
 		{$BASIC_AUTH_USER} {$BASIC_AUTH_HASH}
 	}
 

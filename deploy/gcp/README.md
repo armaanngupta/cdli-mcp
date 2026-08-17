@@ -9,7 +9,7 @@ whole stack without CDLI infrastructure. **Not the production shape** — that i
 | SPA path | `cdli.earth/chat/` | domain root `/` |
 | TLS | framework nginx | Caddy, automatic Let's Encrypt |
 | Front proxy | framework nginx | Caddy |
-| `/mcp` | public, no auth | behind Basic Auth |
+| `/mcp` | public, no auth | public, no auth (same) |
 | Identity / funded tier | CakePHP mints a token | unavailable — BYOM only |
 
 A VM rather than Cloud Run: `/paper` takes 1–2 minutes, and a scale-to-zero service would
@@ -107,8 +107,9 @@ hostname; `docker compose logs caddy` shows the outcome.
 
 1. `docker compose ps` — five containers up, `nginx` absent
 2. `https://<host>/` — browser asks for credentials, then the SPA loads over TLS
-3. `curl -u demo:… -X POST https://<host>/mcp -d '{}'` → **406**. Correct: Streamable HTTP
-   wants an `Accept` header, and it proves the MCP server is reachable.
+3. `curl -X POST https://<host>/mcp -d '{}'` → **406**, with **no credentials**. Correct:
+   `/mcp` is deliberately exempt from Basic Auth so any MCP client can connect, and 406
+   means Streamable HTTP wants an `Accept` header — so the server is reachable.
 4. In the SPA: choose Mistral, paste a key, ask *"Find Ur III tablets from Nippur"* — expect
    a tool indicator and then text arriving **incrementally**. All at once means buffering.
 5. `/paper temple offerings at Girsu` — 1–2 minutes, ending in a downloadable PDF. This is
@@ -147,6 +148,16 @@ here. A free [Mistral](https://console.mistral.ai/) key is enough.
    - `/artifact P100141` — one artifact, metadata and inscription
    - `/cqp w1:[ ( conll:FORM = "lugal" ) ]` — a corpus query
    - `/paper temple offerings at Girsu` — **1–2 minutes**, 15–30 model calls, ends in a PDF
+
+`/mcp` is open, so it can be added to Claude Desktop, Claude Code or any MCP client directly:
+
+```bash
+claude mcp add --transport http cdli-demo https://<host>/mcp
+```
+
+Note the consequence: an unauthenticated `/mcp` on an unattended VM is an open proxy onto
+CDLI's API, and nothing rate-limits it (the per-user limits live in chat-backend, which this
+path bypasses). Acceptable for a short review window; worth watching the CDLI-side load.
 
 Known limitations in this demo:
 
